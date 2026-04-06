@@ -1,0 +1,48 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# Database
+sqlalchemy==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# Validation
+pydantic==2.10.4
+pydantic-settings==2.7.0
+pydantic[email]==2.10.4
+
+# Auth & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+cryptography==44.0.0
+
+# HTTP Client (external APIs)
+httpx==0.28.1
+
+# AI
+google-generativeai==0.8.3
+groq==0.13.1
+langchain==0.3.13
+langchain-google-genai==2.0.7
+langchain-groq==0.2.3
+
+# Cache & Queue
+redis==5.2.1
+
+# Date / Time
+python-dateutil==2.9.0.post0
+pytz==2024.2
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1
+factory-boy==3.3.1
+faker==33.1.0
+
+# Dev tools
+ruff==0.8.4
+black==24.10.0
+pre-commit==4.0.1
