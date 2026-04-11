@@ -1,0 +1,77 @@
+[project]
+name = "deen-backend"
+version = "1.0.0"
+description = "Deen — Privacy-first Islamic lifestyle platform. Free forever."
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.32.1",
+    "python-multipart==0.0.20",
+
+    # Database
+    "sqlalchemy==2.0.36",
+    "asyncpg==0.30.0",
+    "alembic==1.14.0",
+
+    # Validation
+    "pydantic[email]==2.10.4",
+    "pydantic-settings==2.7.0",
+
+    # Auth & Security
+    "python-jose[cryptography]==3.3.0",
+    "bcrypt==4.2.0",
+    "cryptography==44.0.0",
+
+    # HTTP Client
+    "httpx==0.28.1",
+
+    # AI
+    "google-generativeai==0.8.3",
+    "groq==0.13.1",
+
+    # Date / Time
+    "python-dateutil==2.9.0.post0",
+    "pytz==2024.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "aiosqlite==0.20.0",
+    "factory-boy==3.3.1",
+    "faker==33.1.0",
+    "ruff==0.8.4",
+    "black==24.10.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "aiosqlite==0.20.0",
+    "factory-boy==3.3.1",
+    "faker==33.1.0",
+    "ruff==0.8.4",
+    "black==24.10.0",
+]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "UP"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
