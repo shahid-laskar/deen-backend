@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.repositories.base import BaseRepository
 from app.repositories.user import UserRepository
-from app.repositories.prayer import PrayerRepository
+from app.repositories.prayer import PrayerRepository, IslamicEventRepository
 from app.repositories.quran import HifzRepository, DuaFavoriteRepository
 from app.repositories.habit import HabitRepository, HabitLogRepository
 from app.repositories.repos import (
@@ -34,6 +34,8 @@ from app.repositories.repos import (
     FastingRepository,
     AIConversationRepository,
 )
+
+
 
 __all__ = [
     "BaseRepository",
@@ -111,6 +113,9 @@ def get_fasting_repo(db: DB) -> FastingRepository:
 def get_ai_conv_repo(db: DB) -> AIConversationRepository:
     return AIConversationRepository(db)
 
+def get_islamic_event_repo(db: DB) -> IslamicEventRepository:
+    return IslamicEventRepository(db)
+
 
 # ─── Annotated type aliases for routers ──────────────────────────────────────
 # Usage: `user_repo: UserRepo` in a route function signature.
@@ -126,7 +131,7 @@ TaskRepo       = Annotated[TaskRepository,            Depends(get_task_repo)]
 CycleRepo      = Annotated[CycleRepository,           Depends(get_cycle_repo)]
 FastingRepo    = Annotated[FastingRepository,         Depends(get_fasting_repo)]
 AIConvRepo     = Annotated[AIConversationRepository,  Depends(get_ai_conv_repo)]
-
+IslamicEventRepo = Annotated[IslamicEventRepository, Depends(get_islamic_event_repo)]
 # ─── V2 + V3 repositories ──────────────────────────────────────────────────────
 from app.repositories.v2 import (
     FoodItemRepository, MealPlanRepository, MealEntryRepository,

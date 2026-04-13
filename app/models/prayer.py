@@ -52,4 +52,27 @@ class PrayerLog(Base, TimestampMixin):
     is_qadha: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notes: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
+    # Phase 2 additions
+    with_congregation: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    khushu_rating: Mapped[Optional[int]] = mapped_column(nullable=True)   # 1-5
+    location_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
     user: Mapped["User"] = relationship("User", back_populates="prayer_logs")
+
+
+class IslamicEvent(Base, TimestampMixin):
+    """Recurring Islamic calendar events — Ramadan, Eid, etc."""
+    __tablename__ = "islamic_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    name_ar: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    hijri_month: Mapped[int] = mapped_column(nullable=False)        # 1-12
+    hijri_day: Mapped[int] = mapped_column(nullable=False)          # 1-30
+    duration_days: Mapped[int] = mapped_column(nullable=False, default=1)
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Types: eid | ramadan | fasting | blessed_night | significant_day
+    is_recurring: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
+    notification_template: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    deed_of_day: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
