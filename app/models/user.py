@@ -128,6 +128,13 @@ class UserProfile(Base, TimestampMixin):
     prayer_notifications: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     habit_reminder_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # "20:00"
 
+    # Phase 1 additions
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    spiritual_archetype: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    # Values: scholar | devotee | seeker | guardian | servant
+    preferred_language: Mapped[Optional[str]] = mapped_column(String(10), nullable=True, default='en')
+
     user: Mapped["User"] = relationship("User", back_populates="profile")
 
 

@@ -14,6 +14,11 @@ class UserProfileResponse(AppBaseModel):
     notifications_enabled: bool = True
     prayer_notifications: bool = True
     habit_reminder_time: Optional[str] = None
+    # Phase 1
+    city: Optional[str] = None
+    country: Optional[str] = None
+    spiritual_archetype: Optional[str] = None
+    preferred_language: Optional[str] = 'en'
 
 
 class UserResponse(IDSchema, TimestampSchema):
@@ -48,6 +53,11 @@ class ProfileUpdateRequest(AppBaseModel):
     notifications_enabled: Optional[bool] = None
     prayer_notifications: Optional[bool] = None
     habit_reminder_time: Optional[str] = None
+    # Phase 1
+    city: Optional[str] = None
+    country: Optional[str] = None
+    spiritual_archetype: Optional[str] = None
+    preferred_language: Optional[str] = None
 
 
 class ChangePasswordRequest(AppBaseModel):
