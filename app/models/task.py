@@ -54,4 +54,12 @@ class Task(Base, TimestampMixin):
     )
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
+    # Phase 4 additions
+    islamic_context: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    linked_habit_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("habits.id", ondelete="SET NULL"), nullable=True
+    )
+    is_urgent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_important: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
     user: Mapped["User"] = relationship("User", back_populates="tasks")

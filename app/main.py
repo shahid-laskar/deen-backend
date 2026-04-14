@@ -22,6 +22,7 @@ from app.routers import (
     # V3
     community, waqf,
 )
+from app.routers.habits import dhikr_router
 
 
 @asynccontextmanager
@@ -97,7 +98,7 @@ app.include_router(cycle_sync.router, prefix=API)
 # V3 — Community & Waqf
 app.include_router(community.router, prefix=API)
 app.include_router(waqf.router, prefix=API)
-
+app.include_router(dhikr_router, prefix=API)
 
 # ─── Health ───────────────────────────────────────────────────────────────────
 

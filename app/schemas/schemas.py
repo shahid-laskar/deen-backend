@@ -459,3 +459,157 @@ class HifzProgressResponseV2(IDSchema, TimestampSchema):
     ease_factor: float
     interval_days: int
     leitner_box: int = 1
+
+
+# ─── Phase 4: Habit enhanced schemas ─────────────────────────────────────────
+from app.schemas.base import AppBaseModel, IDSchema, TimestampSchema as _TS
+from uuid import UUID as _UUID
+from datetime import date as _date
+from typing import Optional as _Opt, List as _List
+
+class HabitCreateV2(AppBaseModel):
+    name: str
+    description: _Opt[str] = None
+    category: str = "personal"
+    frequency: str = "daily"
+    habit_type: str = "binary"
+    difficulty: str = "medium"
+    days_of_week: _Opt[str] = None
+    target_count: int = 1
+    unit: _Opt[str] = None
+    icon: _Opt[str] = None
+    color: _Opt[str] = None
+    implementation_intention: _Opt[str] = None
+    habit_stack_order: int = 0
+    temptation_bundle: _Opt[str] = None
+    is_preset: bool = False
+    islamic_source: _Opt[str] = None
+    minimum_version: _Opt[str] = None
+    anchor_prayer: _Opt[str] = None
+
+
+class HabitResponseV2(IDSchema, _TS):
+    user_id: _UUID
+    name: str
+    description: _Opt[str] = None
+    category: str
+    frequency: str
+    habit_type: str = "binary"
+    difficulty: str = "medium"
+    days_of_week: _Opt[str] = None
+    target_count: int
+    unit: _Opt[str] = None
+    icon: _Opt[str] = None
+    color: _Opt[str] = None
+    is_active: bool
+    implementation_intention: _Opt[str] = None
+    habit_stack_order: int = 0
+    temptation_bundle: _Opt[str] = None
+    current_streak: int = 0
+    longest_streak: int = 0
+    total_completions: int = 0
+    is_preset: bool = False
+    islamic_source: _Opt[str] = None
+    minimum_version: _Opt[str] = None
+    anchor_prayer: _Opt[str] = None
+    rahmah_tokens: int = 0
+
+
+class HabitWithStreakV2(HabitResponseV2):
+    completed_today: bool = False
+    completion_rate_30d: float = 0.0
+
+
+class HabitUpdateV2(AppBaseModel):
+    name: _Opt[str] = None
+    description: _Opt[str] = None
+    category: _Opt[str] = None
+    frequency: _Opt[str] = None
+    habit_type: _Opt[str] = None
+    difficulty: _Opt[str] = None
+    target_count: _Opt[int] = None
+    unit: _Opt[str] = None
+    icon: _Opt[str] = None
+    color: _Opt[str] = None
+    is_active: _Opt[bool] = None
+    implementation_intention: _Opt[str] = None
+    habit_stack_order: _Opt[int] = None
+    temptation_bundle: _Opt[str] = None
+    islamic_source: _Opt[str] = None
+    anchor_prayer: _Opt[str] = None
+
+
+class ChecklistItemCreate(AppBaseModel):
+    label: str
+    sort_order: int = 0
+    arabic_text: _Opt[str] = None
+    repetition_count: int = 1
+
+
+class ChecklistItemResponse(IDSchema, _TS):
+    habit_id: _UUID
+    label: str
+    sort_order: int
+    arabic_text: _Opt[str] = None
+    repetition_count: int
+
+
+class DhikrSessionCreate(AppBaseModel):
+    dhikr_type: str
+    target_count: int = 33
+    custom_label: _Opt[str] = None
+
+
+class DhikrSessionResponse(IDSchema, _TS):
+    user_id: _UUID
+    session_date: _date
+    dhikr_type: str
+    custom_label: _Opt[str] = None
+    target_count: int
+    current_count: int
+    is_completed: bool
+
+
+class DhikrIncrementRequest(AppBaseModel):
+    increment: int = 1
+
+
+class HabitAnalyticsResponse(AppBaseModel):
+    habit_id: _UUID
+    habit_name: str
+    total_logs: int
+    completion_rate_30d: float
+    completion_rate_7d: float
+    best_streak: int
+    current_streak: int
+    heatmap: _List[dict]    # [{date, completed, count}]
+    day_of_week_rates: dict  # {0: 85.0, 1: 60.0, ...} Mon-Sun
+
+
+class WeeklyReviewResponse(AppBaseModel):
+    week_start: _date
+    week_end: _date
+    total_habits: int
+    total_possible: int
+    total_completed: int
+    completion_rate: float
+    top_habits: _List[str]
+    needs_attention: _List[str]
+    streak_summary: dict
+    habit_health_score: float  # 0-100
+
+
+class HabitLibraryItem(AppBaseModel):
+    key: str
+    name: str
+    category: str
+    habit_type: str
+    difficulty: str
+    icon: _Opt[str] = None
+    target_count: int
+    unit: _Opt[str] = None
+    islamic_source: _Opt[str] = None
+    minimum_version: _Opt[str] = None
+    estimated_minutes: int = 0
+    anchor_prayer: _Opt[str] = None
+    description: _Opt[str] = None
