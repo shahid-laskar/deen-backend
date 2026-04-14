@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = "http://10.44.0.209:5173"
 
     # Database
     DATABASE_URL: str
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 60
 
     # CORS
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    ALLOWED_ORIGINS: List[str] = ["http://10.44.0.209:5173", "http://10.44.0.209:3000"]
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
