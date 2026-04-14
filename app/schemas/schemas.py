@@ -613,3 +613,112 @@ class HabitLibraryItem(AppBaseModel):
     estimated_minutes: int = 0
     anchor_prayer: _Opt[str] = None
     description: _Opt[str] = None
+
+
+# ─── Phase 5: Journal enhanced schemas ────────────────────────────────────────
+from app.schemas.base import AppBaseModel, IDSchema, TimestampSchema as _TS5
+from uuid import UUID as _UUID5
+from datetime import date as _date5
+from typing import Optional as _Opt5, List as _List5, Any as _Any5
+
+class JournalEntryCreateV2(AppBaseModel):
+    title: _Opt5[str] = None
+    content: str = ""
+    mood: _Opt5[str] = None
+    tags: _Opt5[list] = None
+    entry_date: _Opt5[_date5] = None
+    is_private: bool = True
+    gratitude: _Opt5[str] = None
+    intentions: _Opt5[str] = None
+    reflection: _Opt5[str] = None
+    quran_ayah_ref: _Opt5[str] = None
+    # Phase 5 additions
+    journal_mode: str = "free_write"
+    muhasabah_data: _Opt5[dict] = None
+    gratitude_items: _Opt5[list] = None
+    weekly_data: _Opt5[dict] = None
+    ai_prompt_used: _Opt5[str] = None
+    # E2E encryption fields
+    is_encrypted: bool = False
+    iv: _Opt5[str] = None
+    salt: _Opt5[str] = None
+
+
+class JournalEntryResponseV2(IDSchema, _TS5):
+    user_id: _UUID5
+    title: _Opt5[str] = None
+    content: str
+    mood: _Opt5[str] = None
+    tags: _Opt5[list] = None
+    entry_date: _date5
+    is_private: bool
+    gratitude: _Opt5[str] = None
+    intentions: _Opt5[str] = None
+    reflection: _Opt5[str] = None
+    quran_ayah_ref: _Opt5[str] = None
+    journal_mode: _Opt5[str] = "free_write"
+    muhasabah_data: _Opt5[dict] = None
+    gratitude_items: _Opt5[list] = None
+    weekly_data: _Opt5[dict] = None
+    ai_prompt_used: _Opt5[str] = None
+    is_encrypted: bool = False
+    iv: _Opt5[str] = None
+    salt: _Opt5[str] = None
+
+
+class JournalEntryUpdateV2(AppBaseModel):
+    title: _Opt5[str] = None
+    content: _Opt5[str] = None
+    mood: _Opt5[str] = None
+    tags: _Opt5[list] = None
+    is_private: _Opt5[bool] = None
+    gratitude: _Opt5[str] = None
+    intentions: _Opt5[str] = None
+    reflection: _Opt5[str] = None
+    quran_ayah_ref: _Opt5[str] = None
+    journal_mode: _Opt5[str] = None
+    muhasabah_data: _Opt5[dict] = None
+    gratitude_items: _Opt5[list] = None
+    weekly_data: _Opt5[dict] = None
+    ai_prompt_used: _Opt5[str] = None
+    is_encrypted: _Opt5[bool] = None
+    iv: _Opt5[str] = None
+    salt: _Opt5[str] = None
+
+
+class JournalAnalyticsResponse(AppBaseModel):
+    total_entries: int
+    entries_this_month: int
+    current_streak: int           # consecutive days with at least one entry
+    longest_streak: int
+    mood_counts: dict             # {"grateful": 5, "anxious": 2, ...}
+    mood_trend: _List5[dict]      # [{date, mood}] last 30 days
+    modes_used: dict              # {"free_write": 12, "muhasabah": 3, ...}
+    avg_content_length: int
+    most_active_hour: _Opt5[int] = None
+
+
+class DailyInsightResponse(IDSchema, _TS5):
+    user_id: _UUID5
+    insight_text: str
+    category: str
+    relevant_ayah: _Opt5[str] = None
+    relevant_hadith: _Opt5[str] = None
+    generated_at: _date5
+    is_dismissed: bool
+    user_rating: int
+
+
+class MonthlyLetterResponse(IDSchema, _TS5):
+    user_id: _UUID5
+    year: int
+    month: int
+    letter_text: str
+    mood_summary: _Opt5[str] = None
+    top_themes: _Opt5[list] = None
+    entry_count: int
+    is_ai_generated: bool
+
+
+class InsightRatingRequest(AppBaseModel):
+    rating: int   # 1 = helpful, -1 = not relevant, 0 = neutral

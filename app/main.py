@@ -23,7 +23,7 @@ from app.routers import (
     community, waqf,
 )
 from app.routers.habits import dhikr_router
-
+from app.routers.journal import insights_router, letters_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -94,7 +94,8 @@ app.include_router(child.router, prefix=API)
 app.include_router(recitation.router, prefix=API)
 app.include_router(qibla.router, prefix=API)
 app.include_router(cycle_sync.router, prefix=API)
-
+app.include_router(insights_router, prefix=API)
+app.include_router(letters_router, prefix=API)
 # V3 — Community & Waqf
 app.include_router(community.router, prefix=API)
 app.include_router(waqf.router, prefix=API)
