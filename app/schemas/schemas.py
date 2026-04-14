@@ -322,3 +322,140 @@ class DashboardResponse(AppBaseModel):
     tasks_due_today: int
     streak_days: int
     female_status: Optional[dict] = None   # only if gender=female
+
+
+# ─── Phase 3: Dua schemas ─────────────────────────────────────────────────────
+from app.schemas.base import AppBaseModel, IDSchema, TimestampSchema
+from uuid import UUID as _UUID
+from datetime import date as _date
+from typing import Optional as _Opt
+
+class DuaResponse(AppBaseModel):
+    id: _UUID
+    key: str
+    title: str
+    arabic_text: str
+    transliteration: _Opt[str] = None
+    translation: str
+    source: _Opt[str] = None
+    category: str
+    when_to_recite: _Opt[str] = None
+    repetition_count: int = 1
+    dua_order: int = 0
+
+
+class PersonalDuaCreate(AppBaseModel):
+    title: str
+    text: str
+    date_started: _Opt[_date] = None
+
+
+class PersonalDuaUpdate(AppBaseModel):
+    title: _Opt[str] = None
+    text: _Opt[str] = None
+    is_answered: _Opt[bool] = None
+    answered_date: _Opt[_date] = None
+    answered_note: _Opt[str] = None
+    is_shared_anonymously: _Opt[bool] = None
+
+
+class PersonalDuaResponse(IDSchema, TimestampSchema):
+    user_id: _UUID
+    title: str
+    text: str
+    date_started: _date
+    is_answered: bool
+    answered_date: _Opt[_date] = None
+    answered_note: _Opt[str] = None
+    is_shared_anonymously: bool
+
+
+# ─── Phase 3: Hadith schemas ──────────────────────────────────────────────────
+
+class HadithResponse(AppBaseModel):
+    id: _UUID
+    collection: str
+    book_name: _Opt[str] = None
+    hadith_number: str
+    arabic_text: _Opt[str] = None
+    english_text: str
+    narrator_chain: _Opt[str] = None
+    grade: str
+    grade_note: _Opt[str] = None
+    topics: _Opt[str] = None
+
+
+# ─── Phase 3: Quran Reading Log schemas ──────────────────────────────────────
+
+class QuranReadingLogCreate(AppBaseModel):
+    log_date: _Opt[_date] = None
+    surah_from: int
+    ayah_from: int
+    surah_to: int
+    ayah_to: int
+    verses_read: int
+    minutes_read: int = 0
+    minutes_listened: int = 0
+    reciter_used: _Opt[str] = None
+    mode: str = "reading"
+
+
+class QuranReadingLogResponse(IDSchema, TimestampSchema):
+    user_id: _UUID
+    log_date: _date
+    surah_from: int
+    ayah_from: int
+    surah_to: int
+    ayah_to: int
+    verses_read: int
+    minutes_read: int
+    minutes_listened: int
+    reciter_used: _Opt[str] = None
+    mode: str
+
+
+class QuranStatsResponse(AppBaseModel):
+    total_verses_read: int
+    total_minutes_read: int
+    total_minutes_listened: int
+    verses_this_month: int
+    minutes_this_month: int
+    sessions_this_month: int
+    avg_daily_minutes: float
+    projected_khatam_days: _Opt[int] = None   # None if no data
+    khatam_progress_pct: float                  # 0-100
+
+
+# ─── Phase 3: Bookmark schemas ────────────────────────────────────────────────
+
+class QuranBookmarkCreate(AppBaseModel):
+    surah_number: int
+    ayah_number: int
+    note: _Opt[str] = None
+    highlight_color: _Opt[str] = None
+
+
+class QuranBookmarkResponse(IDSchema, TimestampSchema):
+    user_id: _UUID
+    surah_number: int
+    ayah_number: int
+    note: _Opt[str] = None
+    highlight_color: _Opt[str] = None
+
+
+# ─── Phase 3: Hifz enhanced ──────────────────────────────────────────────────
+
+class HifzProgressResponseV2(IDSchema, TimestampSchema):
+    user_id: _UUID
+    surah_number: int
+    surah_name: _Opt[str] = None
+    ayah_from: int
+    ayah_to: int
+    total_ayahs: int
+    status: str
+    last_reviewed: _Opt[_date] = None
+    next_review: _Opt[_date] = None
+    review_count: int
+    ease_factor: float
+    interval_days: int
+    leitner_box: int = 1
