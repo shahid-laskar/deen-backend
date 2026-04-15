@@ -102,6 +102,16 @@ class User(Base, TimestampMixin):
     refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         "RefreshToken", back_populates="user", cascade="all, delete-orphan"
     )
+    # Phase 7 — Gamification
+    xp_events: Mapped[list["UserXP"]] = relationship(
+        "UserXP", back_populates="user", cascade="all, delete-orphan"
+    )
+    badges: Mapped[list["UserBadge"]] = relationship(
+        "UserBadge", back_populates="user", cascade="all, delete-orphan"
+    )
+    quests: Mapped[list["UserQuest"]] = relationship(
+        "UserQuest", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email}>"

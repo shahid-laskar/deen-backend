@@ -21,6 +21,10 @@ from app.routers import (
     meal, workout, child, recitation, qibla, cycle_sync,
     # V3
     community, waqf,
+    # Phase 7
+    gamification,
+    # Phase 9
+    learning, health,
 )
 from app.routers.habits import dhikr_router
 from app.routers.journal import insights_router, letters_router
@@ -100,6 +104,11 @@ app.include_router(letters_router, prefix=API)
 app.include_router(community.router, prefix=API)
 app.include_router(waqf.router, prefix=API)
 app.include_router(dhikr_router, prefix=API)
+# Phase 7 — Gamification
+app.include_router(gamification.router, prefix=API)
+# Phase 9 — Learning & Health
+app.include_router(learning.router, prefix=API)
+app.include_router(health.router, prefix=API)
 
 # ─── Health ───────────────────────────────────────────────────────────────────
 

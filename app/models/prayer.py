@@ -3,7 +3,7 @@ from datetime import date, datetime
 from enum import Enum as PyEnum
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Enum, Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -76,3 +76,23 @@ class IslamicEvent(Base, TimestampMixin):
     description: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     notification_template: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     deed_of_day: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+
+class Mosque(Base, TimestampMixin):
+    """Nearby mosque directory."""
+    __tablename__ = "mosques"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    website: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    prayer_times_source: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    has_jumuah: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    madhab: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+

@@ -19,7 +19,7 @@ from app.schemas.schemas import (
     HifzProgressResponseV2,
 )
 from app.services.quran_service import (
-    fetch_surah_list, fetch_surah, fetch_ayah, search_quran, sm2_next_review,
+    fetch_surah_list, fetch_surah, fetch_ayah, search_quran, sm2_next_review, fetch_tafsir
 )
 
 router = APIRouter(prefix="/quran", tags=["quran"])
@@ -40,6 +40,11 @@ async def get_surah(n: int, translation_id: int = Query(default=131)):
 @router.get("/ayah/{s}/{a}")
 async def get_ayah(s: int, a: int):
     try: return await fetch_ayah(s, a)
+    except Exception as e: raise HTTPException(503, str(e))
+
+@router.get("/tafsir/{s}/{a}")
+async def get_tafsir(s: int, a: int, tafsir_id: int = Query(default=169)):
+    try: return await fetch_tafsir(s, a, tafsir_id)
     except Exception as e: raise HTTPException(503, str(e))
 
 @router.get("/search")

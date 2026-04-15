@@ -23,39 +23,96 @@ async def fetch_surah_list() -> list[dict]:
         return resp.json()["chapters"]
 
 
+import json
+import os
+
+CLEAR_QURAN_CACHE = None
+
+def get_local_clear_quran(surah_number: int):
+    global CLEAR_QURAN_CACHE
+    if CLEAR_QURAN_CACHE is None:
+        try:
+            path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "clear_quran.json")
+            with open(path, "r", encoding="utf-8") as f:
+                CLEAR_QURAN_CACHE = json.load(f).get("data", {}).get("surahs", [])
+        except Exception:
+            return None
+    for s in CLEAR_QURAN_CACHE:
+        if s["number"] == surah_number:
+            return s.get("ayahs", [])
+    return None
+
+def override_translations(data: dict, surah_number: int):
+    local_ayahs = get_local_clear_quran(surah_number)
+    if not local_ayahs:
+        return data
+    ayah_lookup = { a["numberInSurah"]: a["text"] for a in local_ayahs }
+    if "verses" in data:
+        for v in data["verses"]:
+            ayah_num = int(v["verse_key"].split(":")[1])
+            if ayah_num in ayah_lookup:
+                if not v.get("translations"):
+                    v["translations"] = [{"text": ""}]
+                v["translations"][0]["text"] = ayah_lookup[ayah_num]
+    return data
+
+def override_ayah_translation(data: dict, surah_number: int, ayah_number: int):
+    local_ayahs = get_local_clear_quran(surah_number)
+    if not local_ayahs:
+        return data
+    for a in local_ayahs:
+        if a["numberInSurah"] == ayah_number:
+            if "verse" in data:
+                if not data["verse"].get("translations"):
+                    data["verse"]["translations"] = [{"text": ""}]
+                data["verse"]["translations"][0]["text"] = a["text"]
+            return data
+    return data
+
 async def fetch_surah(
     surah_number: int,
-    translation_id: int = 131,  # Saheeh International (default)
+    translation_id: int = 20,  # Saheeh International (20) Default
 ) -> dict:
     """Fetch a surah with translation."""
+    actual_translation_id = 20 if translation_id == 131 else translation_id
     async with httpx.AsyncClient(timeout=15.0) as client:
         resp = await client.get(
             f"{settings.QURAN_API_URL}/verses/by_chapter/{surah_number}",
             params={
                 "language": "en",
                 "words": "true",
-                "translations": str(translation_id),
+                "translations": str(actual_translation_id),
+                "fields": "text_uthmani,text_imlaei",
+                "audio": 7,
                 "per_page": 300,
             },
         )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        if translation_id == 131:
+            data = override_translations(data, surah_number)
+        return data
 
 
-async def fetch_ayah(surah: int, ayah: int, translation_id: int = 131) -> dict:
+async def fetch_ayah(surah: int, ayah: int, translation_id: int = 20) -> dict:
     """Fetch a single ayah with translation and audio."""
+    actual_translation_id = 20 if translation_id == 131 else translation_id
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(
             f"{settings.QURAN_API_URL}/verses/by_key/{surah}:{ayah}",
             params={
                 "language": "en",
                 "words": "true",
-                "translations": str(translation_id),
+                "translations": str(actual_translation_id),
+                "fields": "text_uthmani,text_imlaei",
                 "audio": "1",
             },
         )
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        if translation_id == 131:
+            data = override_ayah_translation(data, surah, ayah)
+        return data
 
 
 async def search_quran(query: str, language: str = "en") -> dict:
@@ -68,6 +125,15 @@ async def search_quran(query: str, language: str = "en") -> dict:
         resp.raise_for_status()
         return resp.json()
 
+async def fetch_tafsir(surah: int, ayah: int, tafsir_id: int = 169) -> dict:
+    """Fetch tafsir (Ibn Kathir English default 169) for a specific ayah."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{settings.QURAN_API_URL}/tafsirs/{tafsir_id}/by_ayah/{surah}:{ayah}",
+            params={"language": "en"}
+        )
+        resp.raise_for_status()
+        return resp.json()
 
 # ─── SM-2 Spaced Repetition ───────────────────────────────────────────────────
 

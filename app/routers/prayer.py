@@ -116,15 +116,47 @@ async def get_prayer_logs(
     return [PrayerLogResponseV2.model_validate(l) for l in logs]
 
 
-@router.get("/summary/today", response_model=DailyPrayerSummary)
-async def get_today_summary(current_user: CurrentUser, db: DB, prayer_repo: PrayerRepo):
-    logs = await prayer_repo.get_today(current_user.id)
+@router.get("/summary", response_model=DailyPrayerSummary)
+async def get_summary(
+    current_user: CurrentUser, 
+    db: DB, 
+    prayer_repo: PrayerRepo,
+    date_str: Optional[date] = Query(None, alias="date")
+):
+    target_date = date_str or date.today()
+    logs = await prayer_repo.get_for_date_range(current_user.id, target_date, target_date)
     by_name = {l.prayer_name: l for l in logs}
     obligatory_logs = [l for l in logs if l.prayer_name in OBLIGATORY]
     total_logged  = len(obligatory_logs)
     total_on_time = len([l for l in obligatory_logs if l.status == "on_time"])
     return DailyPrayerSummary(
-        date=date.today(),
+        date=target_date,
+        fajr=    PrayerLogResponse.model_validate(by_name["fajr"])    if "fajr"    in by_name else None,
+        dhuhr=   PrayerLogResponse.model_validate(by_name["dhuhr"])   if "dhuhr"   in by_name else None,
+        asr=     PrayerLogResponse.model_validate(by_name["asr"])     if "asr"     in by_name else None,
+        maghrib= PrayerLogResponse.model_validate(by_name["maghrib"]) if "maghrib" in by_name else None,
+        isha=    PrayerLogResponse.model_validate(by_name["isha"])     if "isha"    in by_name else None,
+        total_logged=total_logged,
+        total_on_time=total_on_time,
+        completion_pct=round((total_logged / 5) * 100, 1),
+    )
+
+@router.get("/summary/today", response_model=DailyPrayerSummary)
+async def get_today_summary(
+    current_user: CurrentUser, 
+    db: DB, 
+    prayer_repo: PrayerRepo,
+    date_str: Optional[date] = Query(None, alias="date")
+):
+    # Backward compatibility, but use the date param if provided
+    target_date = date_str or date.today()
+    logs = await prayer_repo.get_for_date_range(current_user.id, target_date, target_date)
+    by_name = {l.prayer_name: l for l in logs}
+    obligatory_logs = [l for l in logs if l.prayer_name in OBLIGATORY]
+    total_logged  = len(obligatory_logs)
+    total_on_time = len([l for l in obligatory_logs if l.status == "on_time"])
+    return DailyPrayerSummary(
+        date=target_date,
         fajr=    PrayerLogResponse.model_validate(by_name["fajr"])    if "fajr"    in by_name else None,
         dhuhr=   PrayerLogResponse.model_validate(by_name["dhuhr"])   if "dhuhr"   in by_name else None,
         asr=     PrayerLogResponse.model_validate(by_name["asr"])     if "asr"     in by_name else None,
@@ -268,3 +300,65 @@ async def seed_events(db: DB, current_user: CurrentUser):
     count = await seed_islamic_events(db)
     await db.commit()
     return MessageResponse(message=f"Seeded {count} new Islamic events.")
+
+
+# ─── 2.4 Mosque Finder ────────────────────────────────────────────────────────
+
+from sqlalchemy import select
+
+@router.get("/mosques/nearby")
+async def get_nearby_mosques(
+    db: DB,
+    current_user: CurrentUser,
+    lat: float = Query(..., description="Current latitude"),
+    lng: float = Query(..., description="Current longitude"),
+    radius_km: float = Query(default=50000.0), # No distance restriction for demo
+    limit: int = Query(default=20, le=50),
+):
+    """Return mosques within radius_km, sorted by distance."""
+    from app.models.prayer import Mosque
+    result = await db.execute(select(Mosque))
+    mosques = result.scalars().all()
+    nearby = []
+    for m in mosques:
+        dist = _haversine_km(lat, lng, m.latitude, m.longitude)
+        if dist <= radius_km:
+            nearby.append({
+                "id": str(m.id),
+                "name": m.name,
+                "address": m.address,
+                "city": m.city,
+                "country": m.country,
+                "latitude": m.latitude,
+                "longitude": m.longitude,
+                "phone": m.phone,
+                "website": m.website,
+                "is_verified": m.is_verified,
+                "has_jumuah": m.has_jumuah,
+                "madhab": m.madhab,
+                "distance_km": round(dist, 2),
+            })
+    nearby.sort(key=lambda x: x["distance_km"])
+    return nearby[:limit]
+
+
+@router.post("/mosques/seed", response_model=MessageResponse)
+async def seed_mosques(db: DB, current_user: CurrentUser):
+    """Seed sample mosques for demonstration."""
+    from app.models.prayer import Mosque
+    existing = await db.execute(select(Mosque))
+    if existing.scalars().first():
+        return MessageResponse(message="Mosques already seeded.")
+
+    sample = [
+        Mosque(name="Masjid al-Haram", address="Al-Haram, Mecca, Saudi Arabia", city="Mecca", country="Saudi Arabia", latitude=21.4225, longitude=39.8262, is_verified=True, has_jumuah=True),
+        Mosque(name="Masjid al-Nabawi", address="Al-Madinah Al-Munawwarah, Saudi Arabia", city="Medina", country="Saudi Arabia", latitude=24.4672, longitude=39.6112, is_verified=True, has_jumuah=True),
+        Mosque(name="Masjid al-Aqsa", address="Muslim Quarter, Jerusalem", city="Jerusalem", country="Palestine", latitude=31.7781, longitude=35.2360, is_verified=True, has_jumuah=True),
+        Mosque(name="Islamic Centre London", address="146 Park Rd, London NW8 7RG", city="London", country="UK", latitude=51.5274, longitude=-0.1704, is_verified=True, has_jumuah=True, madhab="hanafi"),
+        Mosque(name="Islamic Cultural Centre New York", address="1711 3rd Ave, New York, NY 10029", city="New York", country="USA", latitude=40.7851, longitude=-73.9465, is_verified=True, has_jumuah=True),
+    ]
+    for m in sample:
+        db.add(m)
+    await db.commit()
+    return MessageResponse(message=f"Seeded {len(sample)} sample mosques.")
+
