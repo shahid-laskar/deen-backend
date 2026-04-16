@@ -18,7 +18,12 @@ from app.models.recitation import RecitationSession, RecitationFeedback
 from app.models.community import (
     CommunityGroup, GroupMember, Post, Comment, PostReaction,
     ContentReport, WaqfProject, Donation,
+    Topic, ScholarProfile, QAQuestion, QAAnswer,
+    AccountabilityCircle, CircleMember, CircleGoal, CircleCheckIn,
+    Halaqah, HalaqahSession, HalaqahNote
 )
+from app.models.finance import ZakatCalculation, ZakatReminder, VettedCharity
+from app.models.family import FamilyPlan, FamilyMember
 # Phase 7 — Gamification
 from app.models.gamification import UserXP, Badge, UserBadge, Quest, UserQuest
 # Phase 9 — Learning
@@ -42,4 +47,9 @@ __all__ = [
     # V3
     "CommunityGroup", "GroupMember", "Post", "Comment", "PostReaction",
     "ContentReport", "WaqfProject", "Donation",
+    "Topic", "ScholarProfile", "QAQuestion", "QAAnswer",
+    "AccountabilityCircle", "CircleMember", "CircleGoal", "CircleCheckIn",
+    "Halaqah", "HalaqahSession", "HalaqahNote",
+    "ZakatCalculation", "ZakatReminder", "VettedCharity",
+    "FamilyPlan", "FamilyMember"
 ]

@@ -234,3 +234,152 @@ class Donation(Base, TimestampMixin):
     external_reference: Mapped[str | None] = mapped_column(String(200))
 
     project: Mapped["WaqfProject"] = relationship(back_populates="donations")
+
+
+# ─── Phase 6: Additional Community Features ─────────────────────────────────────
+
+class Topic(Base, TimestampMixin):
+    __tablename__ = "topics"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class ScholarProfile(Base, TimestampMixin):
+    __tablename__ = "scholar_profiles"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    qualifications: Mapped[str | None] = mapped_column(Text)
+    institution: Mapped[str | None] = mapped_column(String(200))
+    madhab: Mapped[str | None] = mapped_column(String(50))
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verification_date: Mapped[date | None] = mapped_column(Date)
+
+
+class QAQuestion(Base, TimestampMixin):
+    __tablename__ = "qa_questions"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(100))
+    madhab_relevance: Mapped[str | None] = mapped_column(String(50))
+    status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, answered, rejected
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    answers: Mapped[list["QAAnswer"]] = relationship(back_populates="question")
+
+
+class QAAnswer(Base, TimestampMixin):
+    __tablename__ = "qa_answers"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("qa_questions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    scholar_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("scholar_profiles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    citations: Mapped[list | None] = mapped_column(JSON)
+    madhab_note: Mapped[str | None] = mapped_column(Text)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    question: Mapped["QAQuestion"] = relationship(back_populates="answers")
+
+
+class AccountabilityCircle(Base, TimestampMixin):
+    __tablename__ = "accountability_circles"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    check_in_day: Mapped[int] = mapped_column(Integer, default=0) # 0-6 corresponding to Mon-Sun
+    is_private: Mapped[bool] = mapped_column(Boolean, default=True)
+    max_members: Mapped[int] = mapped_column(Integer, default=7)
+
+    members: Mapped[list["CircleMember"]] = relationship(back_populates="circle")
+    goals: Mapped[list["CircleGoal"]] = relationship(back_populates="circle")
+
+
+class CircleMember(Base, TimestampMixin):
+    __tablename__ = "circle_members"
+    __table_args__ = (UniqueConstraint("circle_id", "user_id"),)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    circle_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("accountability_circles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(20), default="member") # admin, member
+
+    circle: Mapped["AccountabilityCircle"] = relationship(back_populates="members")
+
+
+class CircleGoal(Base, TimestampMixin):
+    __tablename__ = "circle_goals"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    circle_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("accountability_circles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+
+    circle: Mapped["AccountabilityCircle"] = relationship(back_populates="goals")
+
+
+class CircleCheckIn(Base, TimestampMixin):
+    __tablename__ = "circle_check_ins"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    goal_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("circle_goals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(20)) # success, failed, warning
+    note: Mapped[str | None] = mapped_column(Text)
+
+
+class Halaqah(Base, TimestampMixin):
+    __tablename__ = "halaqahs"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    h_type: Mapped[str] = mapped_column(String(50), default="open_discussion") # book_study, quran_study, hadith_study
+    curriculum: Mapped[str | None] = mapped_column(Text)
+    moderator_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    max_members: Mapped[int] = mapped_column(Integer, default=20)
+
+    sessions: Mapped[list["HalaqahSession"]] = relationship(back_populates="halaqah")
+
+
+class HalaqahSession(Base, TimestampMixin):
+    __tablename__ = "halaqah_sessions"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    halaqah_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("halaqahs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    topic: Mapped[str] = mapped_column(String(200), nullable=False)
+    session_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="scheduled") # scheduled, completed, cancelled
+
+    halaqah: Mapped["Halaqah"] = relationship(back_populates="sessions")
+
+
+class HalaqahNote(Base, TimestampMixin):
+    __tablename__ = "halaqah_notes"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("halaqah_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+

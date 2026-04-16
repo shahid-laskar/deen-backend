@@ -158,3 +158,178 @@ async def delete_comment(comment_id: UUID, current_user: CurrentUser, db: DB, re
     comment = await repo.get_owned_or_404(comment_id, current_user.id)
     await repo.update(comment, is_active=False)
     return MessageResponse(message="Comment removed.")
+
+
+# ─── Scholar Q&A ───────────────────────────────────────────────────────────────
+
+from app.models.community import QAQuestion, QAAnswer, ScholarProfile
+from pydantic import BaseModel as PydanticBaseModel
+
+class QAQuestionCreate(PydanticBaseModel):
+    text: str
+    category: str
+    madhab_relevance: str | None = None
+    is_anonymous: bool = False
+
+class QAAnswerCreate(PydanticBaseModel):
+    content: str
+    citations: list[str] | None = None
+    madhab_note: str | None = None
+
+
+
+@router.get("/qa/questions")
+async def list_qa_questions(current_user: CurrentUser, db: DB,
+                             category: str = Query(default=None),
+                             status: str = Query(default=None),
+                             limit: int = 20, offset: int = 0):
+    from sqlalchemy import select
+    q = select(QAQuestion)
+    if category:
+        q = q.where(QAQuestion.category == category)
+    if status:
+        q = q.where(QAQuestion.status == status)
+    q = q.offset(offset).limit(limit)
+    result = await db.execute(q)
+    return result.scalars().all()
+
+
+@router.post("/qa/questions", status_code=201)
+async def submit_qa_question(payload: QAQuestionCreate, current_user: CurrentUser, db: DB):
+    question = QAQuestion(user_id=current_user.id, **payload.model_dump())
+    db.add(question)
+    await db.flush()
+    return {"id": str(question.id), "status": "pending", "message": "Question submitted to scholars."}
+
+
+@router.get("/qa/questions/{question_id}/answers")
+async def get_answers(question_id: UUID, current_user: CurrentUser, db: DB):
+    from sqlalchemy import select
+    q = select(QAAnswer).where(QAAnswer.question_id == question_id, QAAnswer.is_published == True)
+    result = await db.execute(q)
+    return result.scalars().all()
+
+
+@router.post("/qa/questions/{question_id}/answers", status_code=201)
+async def submit_qa_answer(question_id: UUID, payload: QAAnswerCreate, current_user: CurrentUser, db: DB):
+    from sqlalchemy import select
+    # Verify scholar profile exists
+    sp_result = await db.execute(select(ScholarProfile).where(ScholarProfile.user_id == current_user.id))
+    scholar = sp_result.scalar_one_or_none()
+    if not scholar or not scholar.is_verified:
+        raise HTTPException(status_code=403, detail="Only verified scholars can answer.")
+    answer = QAAnswer(question_id=question_id, scholar_id=scholar.id, **payload.model_dump())
+    db.add(answer)
+    await db.flush()
+    return {"id": str(answer.id), "message": "Answer submitted for admin review."}
+
+
+# ─── Accountability Circles ────────────────────────────────────────────────────
+
+from app.models.community import AccountabilityCircle, CircleMember, CircleGoal, CircleCheckIn
+from datetime import date as date_type
+
+class CircleCreate(PydanticBaseModel):
+    name: str
+    description: str | None = None
+    check_in_day: int = 0
+
+class CircleGoalCreate(PydanticBaseModel):
+    title: str
+    description: str | None = None
+
+class CircleCheckInCreate(PydanticBaseModel):
+    goal_id: UUID
+    status: str  # success, failed, warning
+    note: str | None = None
+
+
+@router.get("/circles")
+async def list_circles(current_user: CurrentUser, db: DB):
+    from sqlalchemy import select
+    q = select(AccountabilityCircle).join(CircleMember, CircleMember.circle_id == AccountabilityCircle.id).where(CircleMember.user_id == current_user.id)
+    result = await db.execute(q)
+    return result.scalars().all()
+
+
+@router.post("/circles", status_code=201)
+async def create_circle(payload: CircleCreate, current_user: CurrentUser, db: DB):
+    circle = AccountabilityCircle(**payload.model_dump())
+    db.add(circle)
+    await db.flush()
+    member = CircleMember(circle_id=circle.id, user_id=current_user.id, role="admin")
+    db.add(member)
+    await db.flush()
+    return {"id": str(circle.id), "name": circle.name}
+
+
+@router.post("/circles/{circle_id}/join", response_model=MessageResponse)
+async def join_circle(circle_id: UUID, current_user: CurrentUser, db: DB):
+    from sqlalchemy import select
+    existing = await db.execute(select(CircleMember).where(CircleMember.circle_id == circle_id, CircleMember.user_id == current_user.id))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Already a member.")
+    db.add(CircleMember(circle_id=circle_id, user_id=current_user.id, role="member"))
+    await db.flush()
+    return MessageResponse(message="Joined circle!")
+
+
+@router.post("/circles/{circle_id}/goals", status_code=201)
+async def create_circle_goal(circle_id: UUID, payload: CircleGoalCreate, current_user: CurrentUser, db: DB):
+    goal = CircleGoal(circle_id=circle_id, **payload.model_dump())
+    db.add(goal)
+    await db.flush()
+    return {"id": str(goal.id), "title": goal.title}
+
+
+@router.post("/circles/checkins", status_code=201)
+async def submit_circle_checkin(payload: CircleCheckInCreate, current_user: CurrentUser, db: DB):
+    checkin = CircleCheckIn(user_id=current_user.id, date=date_type.today(), **payload.model_dump())
+    db.add(checkin)
+    await db.flush()
+    return {"id": str(checkin.id), "status": checkin.status}
+
+
+# ─── Halaqah ──────────────────────────────────────────────────────────────────
+
+from app.models.community import Halaqah, HalaqahSession, HalaqahNote
+
+class HalaqahCreate(PydanticBaseModel):
+    name: str
+    h_type: str = "open_discussion"
+    curriculum: str | None = None
+    max_members: int = 20
+
+class HalaqahSessionCreate(PydanticBaseModel):
+    topic: str
+    session_date: str  # ISO date
+
+
+@router.get("/halaqahs")
+async def list_halaqahs(current_user: CurrentUser, db: DB):
+    from sqlalchemy import select
+    q = select(Halaqah).where(Halaqah.moderator_id == current_user.id)
+    result = await db.execute(q)
+    return result.scalars().all()
+
+
+@router.post("/halaqahs", status_code=201)
+async def create_halaqah(payload: HalaqahCreate, current_user: CurrentUser, db: DB):
+    halaqah = Halaqah(moderator_id=current_user.id, **payload.model_dump())
+    db.add(halaqah)
+    await db.flush()
+    return {"id": str(halaqah.id), "name": halaqah.name}
+
+
+@router.post("/halaqahs/{halaqah_id}/sessions", status_code=201)
+async def create_halaqah_session(halaqah_id: UUID, payload: HalaqahSessionCreate, current_user: CurrentUser, db: DB):
+    from datetime import date as date_cls
+    session = HalaqahSession(
+        halaqah_id=halaqah_id,
+        topic=payload.topic,
+        session_date=date_cls.fromisoformat(payload.session_date)
+    )
+    db.add(session)
+    await db.flush()
+    return {"id": str(session.id), "topic": session.topic}
+

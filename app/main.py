@@ -23,6 +23,8 @@ from app.routers import (
     community, waqf,
     # Phase 7
     gamification,
+    # Phase 8
+    finance, family,
     # Phase 9
     learning, health,
 )
@@ -106,9 +108,18 @@ app.include_router(waqf.router, prefix=API)
 app.include_router(dhikr_router, prefix=API)
 # Phase 7 — Gamification
 app.include_router(gamification.router, prefix=API)
+# Phase 8 — Finance & Family
+from app.routers import finance, family
+app.include_router(finance.router, prefix=API)
+app.include_router(family.router, prefix=API)
 # Phase 9 — Learning & Health
 app.include_router(learning.router, prefix=API)
 app.include_router(health.router, prefix=API)
+# Phase 10 — Admin, GDPR & Notifications
+from app.routers.admin import router as admin_router, gdpr_router, notif_router
+app.include_router(admin_router, prefix=API)
+app.include_router(gdpr_router, prefix=API)
+app.include_router(notif_router, prefix=API)
 
 # ─── Health ───────────────────────────────────────────────────────────────────
 
