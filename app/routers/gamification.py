@@ -13,14 +13,14 @@ POST /gamification/quests/{id}/update  — update progress
 POST /gamification/badges/seed    — seed badge catalogue
 POST /gamification/quests/seed    — seed quest catalogue
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select, func, desc
 
-from app.core.dependencies import CurrentUser, DB
+from app.core.dependencies import CurrentUser, DB, AdminUser
 from app.models.gamification import UserXP, Badge, UserBadge, Quest, UserQuest, XPSource, QuestStatus
 
 router = APIRouter(prefix="/gamification", tags=["gamification"])
@@ -118,14 +118,14 @@ async def get_xp_history(current_user: CurrentUser, db: DB, limit: int = Query(d
 
 
 @router.post("/xp/award")
-async def award_xp(current_user: CurrentUser, db: DB, source: str, amount: Optional[int] = None, note: Optional[str] = None):
+async def award_xp(current_user: AdminUser, db: DB, source: str, amount: Optional[int] = None, note: Optional[str] = None):
     """Award XP to the current user. Amount defaults to the configured value for the source."""
     try:
         xp_src = XPSource(source)
     except ValueError:
         raise HTTPException(status_code=422, detail=f"Invalid XP source: {source}")
     amt = amount or XP_PER_ACTION.get(xp_src, 5)
-    event = UserXP(user_id=current_user.id, source=xp_src, amount=amt, note=note, earned_at=datetime.utcnow())
+    event = UserXP(user_id=current_user.id, source=xp_src, amount=amt, note=note, earned_at=datetime.now(timezone.utc))
     db.add(event)
     await db.commit()
     total_xp_result = await db.execute(select(func.sum(UserXP.amount)).where(UserXP.user_id == current_user.id))
@@ -175,8 +175,8 @@ async def start_quest(quest_id: UUID, current_user: CurrentUser, db: DB):
     existing = await db.execute(select(UserQuest).where(UserQuest.user_id == current_user.id, UserQuest.quest_id == quest_id, UserQuest.status == QuestStatus.ACTIVE))
     if existing.scalar():
         raise HTTPException(409, "Quest already active")
-    expires = datetime.utcnow() + timedelta(days=quest.duration_days) if quest.duration_days else None
-    uq = UserQuest(user_id=current_user.id, quest_id=quest_id, status=QuestStatus.ACTIVE, progress=0, target=quest.criteria.get("target", 1) if quest.criteria else 1, started_at=datetime.utcnow(), expires_at=expires)
+    expires = datetime.now(timezone.utc) + timedelta(days=quest.duration_days) if quest.duration_days else None
+    uq = UserQuest(user_id=current_user.id, quest_id=quest_id, status=QuestStatus.ACTIVE, progress=0, target=quest.criteria.get("target", 1) if quest.criteria else 1, started_at=datetime.now(timezone.utc), expires_at=expires)
     db.add(uq)
     await db.commit()
     await db.refresh(uq)
@@ -191,10 +191,10 @@ async def update_quest_progress(user_quest_id: UUID, current_user: CurrentUser, 
     uq.progress = min(progress, uq.target)
     if uq.progress >= uq.target:
         uq.status = QuestStatus.COMPLETED
-        uq.completed_at = datetime.utcnow()
+        uq.completed_at = datetime.now(timezone.utc)
         quest = await db.get(Quest, uq.quest_id)
         # Award XP
-        xp_event = UserXP(user_id=current_user.id, source=XPSource.QUEST_COMPLETE, amount=quest.xp_reward if quest else 100, note=f"Quest: {quest.title if quest else 'Unknown'}", earned_at=datetime.utcnow())
+        xp_event = UserXP(user_id=current_user.id, source=XPSource.QUEST_COMPLETE, amount=quest.xp_reward if quest else 100, note=f"Quest: {quest.title if quest else 'Unknown'}", earned_at=datetime.now(timezone.utc))
         db.add(xp_event)
     await db.commit()
     return {"status": uq.status, "progress": uq.progress, "target": uq.target}
@@ -231,7 +231,7 @@ QUEST_CATALOGUE = [
 
 
 @router.post("/badges/seed")
-async def seed_badges(db: DB, current_user: CurrentUser):
+async def seed_badges(db: DB, current_user: AdminUser):
     from sqlalchemy import text
     for b in BADGE_CATALOGUE:
         existing = await db.execute(select(Badge).where(Badge.slug == b["slug"]))
@@ -242,7 +242,7 @@ async def seed_badges(db: DB, current_user: CurrentUser):
 
 
 @router.post("/quests/seed")
-async def seed_quests(db: DB, current_user: CurrentUser):
+async def seed_quests(db: DB, current_user: AdminUser):
     for q in QUEST_CATALOGUE:
         existing = await db.execute(select(Quest).where(Quest.slug == q["slug"]))
         if not existing.scalar():

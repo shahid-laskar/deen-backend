@@ -361,6 +361,7 @@ async def dismiss_insight(insight_id: UUID, current_user: CurrentUser, db: DB):
         raise HTTPException(404, "Insight not found.")
     insight.is_dismissed = True
     await db.flush()
+    await db.commit()
     await db.refresh(insight)
     return DailyInsightResponse.model_validate(insight)
 
@@ -382,6 +383,7 @@ async def rate_insight(
         raise HTTPException(404, "Insight not found.")
     insight.user_rating = payload.rating
     await db.flush()
+    await db.commit()
     await db.refresh(insight)
     return DailyInsightResponse.model_validate(insight)
 

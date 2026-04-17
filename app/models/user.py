@@ -65,8 +65,13 @@ class User(Base, TimestampMixin):
     prayer_method: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
     google_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    
+    # Phase 10 — Admin 2FA
+    totp_secret: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Relationships
     profile: Mapped[Optional["UserProfile"]] = relationship(

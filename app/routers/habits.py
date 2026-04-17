@@ -2,7 +2,7 @@
 Habits Router — Phase 4
 All v1 endpoints preserved + dhikr counter + library + analytics + checklists.
 """
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -295,7 +295,7 @@ async def increment_dhikr(session_id: UUID, payload: DhikrIncrementRequest, curr
     if not s: raise HTTPException(404, "Session not found.")
     s.current_count = min(s.current_count + payload.increment, s.target_count)
     if s.current_count >= s.target_count and not s.is_completed:
-        s.is_completed = True; s.completed_at = datetime.utcnow().isoformat()
+        s.is_completed = True; s.completed_at = datetime.now(timezone.utc).isoformat()
     await db.flush(); await db.refresh(s)
     return DhikrSessionResponse.model_validate(s)
 
@@ -306,7 +306,7 @@ async def complete_dhikr(session_id: UUID, current_user: CurrentUser, db: DB):
     r = await db.execute(select(DhikrSession).where(DhikrSession.id == session_id, DhikrSession.user_id == current_user.id))
     s = r.scalar_one_or_none()
     if not s: raise HTTPException(404, "Session not found.")
-    s.is_completed = True; s.completed_at = datetime.utcnow().isoformat()
+    s.is_completed = True; s.completed_at = datetime.now(timezone.utc).isoformat()
     await db.flush(); await db.refresh(s)
     return DhikrSessionResponse.model_validate(s)
 

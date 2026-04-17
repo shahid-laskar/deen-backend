@@ -10,7 +10,7 @@ Design principles:
 - v1: rules-based | v2 upgrade path: collaborative filtering on user ratings
 """
 
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, time, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -313,10 +313,11 @@ class InsightEngine:
         from app.models.quran import QuranReadingLog
 
         cutoff = date.today() - timedelta(days=7)
+        cutoff_dt = datetime.combine(cutoff, time.min).replace(tzinfo=timezone.utc)
 
         prayer_result = await self.db.execute(
             select(func.count()).select_from(PrayerLog)
-            .where(PrayerLog.user_id == self.user_id, PrayerLog.prayed_at >= cutoff, PrayerLog.status == "on_time")
+            .where(PrayerLog.user_id == self.user_id, PrayerLog.prayed_at >= cutoff_dt, PrayerLog.status == "on_time")
         )
         prayers_on_time = prayer_result.scalar() or 0
 

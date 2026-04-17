@@ -35,8 +35,17 @@ class ScreenerInput(BaseModel):
 async def calculate_zakat(payload: ZakatInput, current_user: CurrentUser, db: DB):
     # Mock calculation: Zakat is 2.5% on net assets above nisab.
     # We assume the user inputs amounts in a standard currency.
-    total_assets = sum(float(v) for v in payload.assets.values() if isinstance(v, (int, float)))
-    total_liabilities = sum(float(v) for v in payload.liabilities.values() if isinstance(v, (int, float)))
+    def safe_sum(d: dict) -> float:
+        total = 0.0
+        for v in d.values():
+            try:
+                total += float(v)
+            except (ValueError, TypeError):
+                continue
+        return total
+
+    total_assets = safe_sum(payload.assets)
+    total_liabilities = safe_sum(payload.liabilities)
     
     net_assets = total_assets - total_liabilities
     # Mock nisab value, normally fetched from live metals API

@@ -23,6 +23,23 @@ from app.services.quran_service import (
 )
 
 router = APIRouter(prefix="/quran", tags=["quran"])
+@router.get("/verse-of-day")
+async def get_verse_of_day():
+    """Fetch a random ayah for the daily highlight."""
+    import random
+    s = random.randint(1, 114)
+    # Get max ayats for this surah (simple approximation or fetch)
+    # For now, let's just pick a safe range or fetch surah metadata
+    try:
+        surah_data = await fetch_surah(s)
+        verses = surah_data.get("verses", [])
+        if not verses: raise Exception("No verses")
+        v = random.choice(verses)
+        return v
+    except Exception as e:
+        # Fallback to 1:1
+        return await fetch_ayah(1, 1)
+
 TOTAL_QURAN_VERSES = 6236
 
 # ─── Surah / text ─────────────────────────────────────────────────────────────

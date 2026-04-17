@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import decode_token
-from app.models.user import User
+from app.models.user import User, Gender
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -70,20 +70,50 @@ async def get_current_user_optional(
         return None
 
 
+async def require_admin(
+    current_user: Annotated[User, Depends(get_current_user)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+) -> User:
+    """Guard for admin-only endpoints. Enforces 2FA if enabled."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator privileges required.",
+        )
+    
+    if current_user.totp_enabled:
+        # Check for mfa_verified claim in the token
+        try:
+            payload = decode_token(credentials.credentials)
+            if not payload.get("mfa_verified"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Two-factor authentication required.",
+                )
+        except:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Two-factor authentication required.",
+            )
+
+    return current_user
+    
+
 async def require_female_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
-    """Guard for female-only module endpoints."""
-    if current_user.gender != "female":
+    """Guard for female-only endpoints."""
+    if current_user.gender != Gender.FEMALE:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="This feature is only available for female users.",
+            detail="Access restricted to female users.",
         )
     return current_user
 
 
 # Shorthand type aliases for route signatures
 CurrentUser = Annotated[User, Depends(get_current_user)]
+AdminUser = Annotated[User, Depends(require_admin)]
 CurrentUserOptional = Annotated[User | None, Depends(get_current_user_optional)]
 FemaleUser = Annotated[User, Depends(require_female_user)]
 DB = Annotated[AsyncSession, Depends(get_db)]

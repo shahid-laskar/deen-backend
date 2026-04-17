@@ -128,7 +128,7 @@ FORMAT: Use clear paragraphs. Use bullet points only for lists of 3+ items. No u
 
 # ─── AI API Calls ─────────────────────────────────────────────────────────────
 
-async def call_gemini(messages: list[dict], system_prompt: str) -> str:
+async def call_gemini(messages: list[dict], system_prompt: str, max_tokens: Optional[int] = None) -> str:
     """Call Gemini 2.0 Flash API."""
     # Convert to Gemini format
     gemini_messages = []
@@ -141,7 +141,7 @@ async def call_gemini(messages: list[dict], system_prompt: str) -> str:
         "contents": gemini_messages,
         "generationConfig": {
             "temperature": settings.AI_TEMPERATURE,
-            "maxOutputTokens": settings.AI_MAX_TOKENS,
+            "maxOutputTokens": max_tokens or settings.AI_MAX_TOKENS,
         },
     }
 
@@ -156,6 +156,12 @@ async def call_gemini(messages: list[dict], system_prompt: str) -> str:
         data = resp.json()
 
     return data["candidates"][0]["content"]["parts"][0]["text"]
+
+
+async def _call_gemini(system_prompt: str, user_message: str, max_tokens: int = 1000) -> str:
+    """Internal helper for simple system/user prompt calls (e.g. from recitation service)."""
+    messages = [{"role": "user", "content": user_message}]
+    return await call_gemini(messages, system_prompt, max_tokens=max_tokens)
 
 
 async def call_groq(messages: list[dict], system_prompt: str) -> str:

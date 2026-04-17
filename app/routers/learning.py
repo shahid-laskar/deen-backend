@@ -9,13 +9,13 @@ POST /learning/vocab/{id}/review — submit Leitner spaced repetition review
 POST /learning/seed              — seed test courses
 """
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select, func
 
-from app.core.dependencies import CurrentUser, DB
+from app.core.dependencies import CurrentUser, DB, AdminUser
 from app.models.learning import LearningPath, LearningModule, LessonContent, UserLearningProgress, VocabWord, UserVocab
 from app.models.gamification import UserXP, XPSource
 
@@ -76,7 +76,7 @@ async def complete_lesson(lesson_id: uuid.UUID, current_user: CurrentUser, db: D
     if existing.scalar():
         return {"message": "Already completed", "xp_rewarded": 0}
 
-    prog = UserLearningProgress(user_id=current_user.id, lesson_id=lesson_id, completed_at=datetime.utcnow())
+    prog = UserLearningProgress(user_id=current_user.id, lesson_id=lesson_id, completed_at=datetime.now(timezone.utc))
     db.add(prog)
 
     # Award Gamification XP (Generic quest_complete source for now, or new source type)
@@ -89,7 +89,7 @@ async def complete_lesson(lesson_id: uuid.UUID, current_user: CurrentUser, db: D
 
 @router.get("/vocab/review")
 async def get_vocab_due(current_user: CurrentUser, db: DB):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     # Find all due vocab
     result = await db.execute(
         select(UserVocab, VocabWord)
@@ -115,14 +115,14 @@ async def review_vocab(user_vocab_id: uuid.UUID, remembered: bool, current_user:
         uv.box_level = max(0, uv.box_level - 1)
 
     intervals = {0: 0, 1: 1, 2: 3, 3: 7, 4: 14, 5: 30} # days
-    uv.next_review_at = datetime.utcnow() + timedelta(days=intervals[uv.box_level])
+    uv.next_review_at = datetime.now(timezone.utc) + timedelta(days=intervals[uv.box_level])
 
     await db.commit()
     return {"box_level": uv.box_level, "next_review_at": uv.next_review_at.isoformat()}
 
 
 @router.post("/seed")
-async def seed_learning(db: DB):
+async def seed_learning(db: DB, current_user: AdminUser):
     # 1. Vocab words
     words = [
         {"arabic": "اللَّهُ", "transliteration": "Allahu", "translation": "God"},
@@ -168,6 +168,21 @@ async def seed_learning(db: DB):
         arl4 = LessonContent(module_id=arm1.id, title="Review Quiz: Lesson 1", content_type="quiz", content_data={"questions": [{"Q": "How do you say 'This is a door' in Arabic?", "A": "هَذَا بَابٌ"}, {"Q": "How do you ask 'What is this?'", "A": "مَا هَذَا؟"}]}, xp_reward=60, order_index=3)
 
         db.add_all([arl1, arl2, arl3, arl4])
+
+    existing_hadith = await db.execute(select(LearningPath).where(LearningPath.title == "40 Hadith of An-Nawawi"))
+    if not existing_hadith.scalar():
+        h_path = LearningPath(title="40 Hadith of An-Nawawi", description="A compilation of the most important sayings and actions of the Prophet (ﷺ).", icon="💠", difficulty="beginner")
+        db.add(h_path)
+        await db.flush()
+
+        hm1 = LearningModule(path_id=h_path.id, title="Module 1: Intentions and Pillars", description="Foundational hadith regarding inner and outer faith.", order_index=0)
+        db.add(hm1)
+        await db.flush()
+
+        hl1 = LessonContent(module_id=hm1.id, title="Hadith 1: Actions are by Intentions", content_type="article", content_data={"text": "## Hadith 1: Actions are by Intentions\n\nOn the authority of Commander of the Faithful, Abu Hafs 'Umar bin al-Khattab (may Allah be pleased with him), who said: I heard the Messenger of Allah (ﷺ) say:\n\n> 'Actions are but by intentions and every man shall have only that which he intended. Thus he whose migration was for Allah and His Messenger, his migration was for Allah and His Messenger, and he whose migration was to achieve some worldly benefit or to take some woman in marriage, his migration was for that for which he migrated.'\n\n[Related by Bukhari & Muslim]\n\n### Key Lessons:\n1. **Sincerity (Ikhlas)**: Every action must be for the sake of Allah alone.\n2. **The Heart**: The intention is located in the heart, not spoken on the tongue.\n3. **Reward**: You are rewarded based on your motive, even if the action is small."}, xp_reward=50, order_index=0)
+        hl2 = LessonContent(module_id=hm1.id, title="Hadith 2: Islam, Iman, and Ihsan", content_type="article", content_data={"text": "## Hadith 2: The Hadith of Jibril\n\nThis famous Hadith records the Angel Jibril (Gabriel) coming to the Prophet (ﷺ) to teach the companions their religion.\n\n### Three Levels of Faith:\n- **Islam**: The outward submission (5 Pillars).\n- **Iman**: The inward belief (6 Pillars of Faith).\n- **Ihsan**: Spiritual excellence—to worship Allah as if you see Him.\n\nIt also mentions the signs of the Hour."}, xp_reward=60, order_index=1)
+        
+        db.add_all([hl1, hl2])
 
     await db.commit()
     return {"message": "Learning Hub seeded successfully"}
