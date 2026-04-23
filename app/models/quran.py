@@ -196,11 +196,80 @@ class QuranBookmark(Base, TimestampMixin):
     ayah_number: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     highlight_color: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # gold|green|blue|red|purple
+    folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("bookmark_folders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     user: Mapped["User"] = relationship("User")
+    folder: Mapped[Optional["BookmarkFolder"]] = relationship("BookmarkFolder", back_populates="bookmarks")
 
 
 # ─── Phase 3: Hifz Leitner enhancement ──────────────────────────────────────
 
-# Add leitner_box to HifzProgress via ALTER (handled in migration)
+# leitner_box lives on HifzProgress (already there)
 # Values 1-5; 1 = new/difficult, 5 = mastered
+
+
+# ─── Lovable Plan: Server-side last-read ────────────────────────────────────
+
+class QuranLastRead(Base, TimestampMixin):
+    """Server-side last-read position — syncs across devices."""
+    __tablename__ = "quran_last_read"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False, unique=True, index=True
+    )
+    surah_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    ayah_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    surah_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
+    surah_arabic: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    total_ayahs: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    user: Mapped["User"] = relationship("User")
+
+
+# ─── Lovable Plan: Bookmark folders ─────────────────────────────────────────
+
+class BookmarkFolder(Base, TimestampMixin):
+    """Logical groups for Quran bookmarks."""
+    __tablename__ = "bookmark_folders"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    color: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)  # e.g. "gold"|"green"
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    user: Mapped["User"] = relationship("User")
+    bookmarks: Mapped[list["QuranBookmark"]] = relationship("QuranBookmark", back_populates="folder")
+
+
+# ─── Lovable Plan: Khatam plans ──────────────────────────────────────────────
+
+class KhatamPlan(Base, TimestampMixin):
+    """User-defined plan to complete the Quran by a target date."""
+    __tablename__ = "khatam_plans"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    target_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    daily_verse_goal: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+    user: Mapped["User"] = relationship("User")

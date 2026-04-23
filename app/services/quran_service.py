@@ -1,10 +1,3 @@
-"""
-Quran Service
-=============
-- Quran.com API v4 integration for verses, surahs, audio
-- SM-2 spaced repetition for Hifz scheduling
-"""
-
 from datetime import date, timedelta
 from typing import Optional
 
@@ -13,7 +6,33 @@ import httpx
 from app.core.config import settings
 
 
-# ─── Quran API ────────────────────────────────────────────────────────────────
+# ─── Static metadata lists ────────────────────────────────────────────────────
+
+RECITERS_LIST = [
+    {"id": 7,   "name": "Mishari Rashid Al-Afasy", "style": "Murattal"},
+    {"id": 1,   "name": "AbdulBaset AbdulSamad",   "style": "Murattal"},
+    {"id": 5,   "name": "Mahmoud Khalil Al-Husary", "style": "Murattal"},
+    {"id": 3,   "name": "Mohamed Siddiq Al-Minshawi", "style": "Murattal"},
+    {"id": 10,  "name": "Yasser Ad-Dossari",        "style": "Murattal"},
+    {"id": 11,  "name": "Saad Al-Ghamdi",           "style": "Murattal"},
+    {"id": 12,  "name": "Ali Abdur-Rahman Al-Huthaify", "style": "Murattal"},
+    {"id": 4,   "name": "Nasser Al-Qatami",         "style": "Murattal"},
+]
+
+TRANSLATIONS_LIST = [
+    {"id": 20,  "language": "en", "author": "Saheeh International"},
+    {"id": 131, "language": "en", "author": "Clear Quran (Dr. Mustafa Khattab)"},
+    {"id": 85,  "language": "en", "author": "Pickthall"},
+    {"id": 95,  "language": "en", "author": "Yusuf Ali"},
+    {"id": 101, "language": "en", "author": "Dr. Mustafa Khattab"},
+    {"id": 149, "language": "en", "author": "T.B. Irving"},
+    {"id": 167, "language": "en", "author": "The Monotheist Group"},
+    {"id": 22,  "language": "ur", "author": "Maulana Fateh Muhammad Jalandhari"},
+    {"id": 54,  "language": "tr", "author": "Nureddin Uzunoglu"},
+    {"id": 31,  "language": "fr", "author": "Hamidullah"},
+]
+
+
 
 async def fetch_surah_list() -> list[dict]:
     """Fetch all 114 surahs with metadata."""
@@ -72,6 +91,7 @@ def override_ayah_translation(data: dict, surah_number: int, ayah_number: int):
 async def fetch_surah(
     surah_number: int,
     translation_id: int = 20,  # Saheeh International (20) Default
+    reciter_id: int = 7,       # Alafasy Default
 ) -> dict:
     """Fetch a surah with translation."""
     actual_translation_id = 20 if translation_id == 131 else translation_id
@@ -83,7 +103,7 @@ async def fetch_surah(
                 "words": "true",
                 "translations": str(actual_translation_id),
                 "fields": "text_uthmani,text_imlaei",
-                "audio": 7,
+                "audio": str(reciter_id),
                 "per_page": 300,
             },
         )
@@ -115,12 +135,12 @@ async def fetch_ayah(surah: int, ayah: int, translation_id: int = 20) -> dict:
         return data
 
 
-async def search_quran(query: str, language: str = "en") -> dict:
+async def search_quran(query: str, language: str = "en", size: int = 50, page: int = 1) -> dict:
     """Search Quran by keyword."""
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(
             f"{settings.QURAN_API_URL}/search",
-            params={"q": query, "language": language, "size": 20},
+            params={"q": query, "language": language, "size": size, "page": page},
         )
         resp.raise_for_status()
         return resp.json()
@@ -135,7 +155,60 @@ async def fetch_tafsir(surah: int, ayah: int, tafsir_id: int = 169) -> dict:
         resp.raise_for_status()
         return resp.json()
 
+
+async def fetch_juz(juz_number: int, translation_id: int = 20) -> dict:
+    """Fetch all verses in a juz (1-30) with translation."""
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        resp = await client.get(
+            f"{settings.QURAN_API_URL}/verses/by_juz/{juz_number}",
+            params={
+                "language": "en",
+                "words": "true",
+                "translations": str(translation_id),
+                "fields": "text_uthmani",
+                "per_page": 300,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def fetch_page(page_number: int, translation_id: int = 20) -> dict:
+    """Fetch all verses on a Mushaf page (1-604) with translation."""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        resp = await client.get(
+            f"{settings.QURAN_API_URL}/verses/by_page/{page_number}",
+            params={
+                "language": "en",
+                "words": "true",
+                "translations": str(translation_id),
+                "fields": "text_uthmani",
+                "per_page": 50,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
+async def fetch_word_by_word(surah: int, ayah: int) -> dict:
+    """Fetch word-level breakdown with transliteration and translation."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{settings.QURAN_API_URL}/verses/by_key/{surah}:{ayah}",
+            params={
+                "language": "en",
+                "words": "true",
+                "word_fields": "text_uthmani,transliteration,translation,audio_url",
+                "word_translation_language": "en",
+                "fields": "text_uthmani",
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+
 # ─── SM-2 Spaced Repetition ───────────────────────────────────────────────────
+
 
 def sm2_next_review(
     quality: int,           # 0–5 rating
