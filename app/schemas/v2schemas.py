@@ -272,6 +272,13 @@ class ChildResponse(OrmBase):
     avatar_emoji: str
     notes: Optional[str] = None
     is_active: bool
+    # Gamification
+    xp_total: int = 0
+    level: int = 1
+    current_streak: int = 0
+    longest_streak: int = 0
+    last_activity_date: Optional[date] = None
+    age_group: Optional[str] = None
     created_at: datetime
 
 
@@ -324,6 +331,8 @@ class DuaTeachingResponse(OrmBase):
     status: str
     started_date: Optional[date] = None
     mastered_date: Optional[date] = None
+    practice_count: int = 0
+    last_practiced: Optional[date] = None
     notes: Optional[str] = None
     created_at: datetime
 
@@ -346,6 +355,68 @@ class LessonLogResponse(OrmBase):
     duration_minutes: Optional[int] = None
     notes: Optional[str] = None
     rating: Optional[int] = None
+    created_at: datetime
+
+
+class ChildActivityLogCreate(BaseModel):
+    activity_key: str = Field(..., max_length=100)
+    activity_name: str = Field(..., max_length=200)
+    activity_category: str  # quran, salah, dua, story, akhlaq, craft
+    xp_earned: int = Field(default=10, ge=0)
+    duration_minutes: Optional[int] = None
+    completed: bool = True
+    log_date: Optional[date] = None
+    notes: Optional[str] = None
+    logged_by: str = "parent"  # parent or child
+
+
+class ChildActivityLogResponse(OrmBase):
+    id: uuid.UUID
+    child_id: uuid.UUID
+    activity_key: str
+    activity_name: str
+    activity_category: str
+    xp_earned: int
+    duration_minutes: Optional[int] = None
+    completed: bool
+    log_date: date
+    notes: Optional[str] = None
+    logged_by: str
+    created_at: datetime
+
+
+class ChildBadgeResponse(OrmBase):
+    id: uuid.UUID
+    child_id: uuid.UUID
+    badge_key: str
+    badge_name: str
+    badge_icon: str
+    badge_category: str
+    earned_date: date
+    xp_awarded: int
+    created_at: datetime
+
+
+class ChildActivityResult(BaseModel):
+    """Response from logging an activity — includes XP gain, level-up, new badges."""
+    activity: ChildActivityLogResponse
+    xp_gained: int
+    new_total_xp: int
+    new_level: int
+    level_name: str
+    leveled_up: bool
+    new_badges: list[ChildBadgeResponse] = []
+
+
+class ChildStoryProgressResponse(OrmBase):
+    id: uuid.UUID
+    child_id: uuid.UUID
+    story_key: str
+    started_date: Optional[date] = None
+    completed_date: Optional[date] = None
+    is_favorite: bool
+    times_read: int
+    xp_earned: int
     created_at: datetime
 
 

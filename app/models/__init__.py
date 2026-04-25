@@ -12,7 +12,7 @@ from app.models.ai import AIConversation
 # V2
 from app.models.meal import FoodItem, MealPlan, MealEntry
 from app.models.workout import Exercise, WorkoutPlan, WorkoutSession
-from app.models.child import Child, ChildMilestone, DuaTeachingLog, IslamicLessonLog
+from app.models.child import Child, ChildMilestone, DuaTeachingLog, IslamicLessonLog, ChildBadge, ChildActivityLog, ChildStoryProgress
 from app.models.recitation import RecitationSession, RecitationFeedback
 # V3
 from app.models.community import (
@@ -42,7 +42,7 @@ __all__ = [
     # V2
     "FoodItem", "MealPlan", "MealEntry",
     "Exercise", "WorkoutPlan", "WorkoutSession",
-    "Child", "ChildMilestone", "DuaTeachingLog", "IslamicLessonLog",
+    "Child", "ChildMilestone", "DuaTeachingLog", "IslamicLessonLog", "ChildBadge", "ChildActivityLog", "ChildStoryProgress",
     "RecitationSession", "RecitationFeedback",
     # V3
     "CommunityGroup", "GroupMember", "Post", "Comment", "PostReaction",
