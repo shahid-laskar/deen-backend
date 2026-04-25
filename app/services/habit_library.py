@@ -118,13 +118,27 @@ HABIT_LIBRARY = [
      "islamic_source": "Abu Dawud 5082 — Morning/evening adhkar from the Sunnah",
      "minimum_version": "Start with Ayat al-Kursi + 3 Quls × 3",
      "estimated_minutes": 10, "anchor_prayer": "fajr",
-     "description": "Complete morning remembrance after Fajr"},
+     "description": "Complete morning remembrance after Fajr",
+     "checklist_items": [
+         {"label": "Ayat al-Kursi", "arabic_text": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ", "repetition_count": 1},
+         {"label": "Surah Al-Ikhlas", "arabic_text": "قُلْ هُوَ اللَّهُ أَحَدٌ", "repetition_count": 3},
+         {"label": "Surah Al-Falaq", "arabic_text": "قُلْ أَعُوذُ بِرَبِّ ٱلْفَلَقِ", "repetition_count": 3},
+         {"label": "Surah An-Nas", "arabic_text": "قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ", "repetition_count": 3},
+         {"label": "Sayyid al-Istighfar", "repetition_count": 1}
+     ]},
     {"key": "evening_adhkar", "name": "Evening adhkar (full)", "category": "dhikr", "habit_type": "checklist", "difficulty": "medium",
      "icon": "🌆", "target_count": 1, "unit": "session",
      "islamic_source": "Abu Dawud 5082 — Before Maghrib adhkar",
      "minimum_version": "Start with just SubhanAllahi wa bihamdih × 100",
      "estimated_minutes": 10, "anchor_prayer": "asr",
-     "description": "Complete evening remembrance before Maghrib"},
+     "description": "Complete evening remembrance before Maghrib",
+     "checklist_items": [
+         {"label": "Ayat al-Kursi", "arabic_text": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ", "repetition_count": 1},
+         {"label": "Surah Al-Ikhlas", "arabic_text": "قُلْ هُوَ اللَّهُ أَحَدٌ", "repetition_count": 3},
+         {"label": "Surah Al-Falaq", "arabic_text": "قُلْ أَعُوذُ بِرَبِّ ٱلْفَلَقِ", "repetition_count": 3},
+         {"label": "Surah An-Nas", "arabic_text": "قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ", "repetition_count": 3},
+         {"label": "Sayyid al-Istighfar", "repetition_count": 1}
+     ]},
     {"key": "subhanallah_100", "name": "SubhanAllahi wa bihamdih ×100", "category": "dhikr", "habit_type": "quantity", "difficulty": "easy",
      "icon": "📿", "target_count": 100, "unit": "times",
      "islamic_source": "Bukhari 6405 — Forgives sins like foam of the sea",
@@ -148,7 +162,13 @@ HABIT_LIBRARY = [
      "islamic_source": "Muslim 597 — SubhanAllah 33, Alhamdulillah 33, Allahu Akbar 33",
      "minimum_version": "One prayer at a time — start with after Fajr",
      "estimated_minutes": 3, "anchor_prayer": "fajr",
-     "description": "Complete tasbih after every fard salah"},
+     "description": "Complete tasbih after every fard salah",
+     "checklist_items": [
+         {"label": "SubhanAllah", "arabic_text": "سُبْحَانَ اللَّهِ", "repetition_count": 33},
+         {"label": "Alhamdulillah", "arabic_text": "الْحَمْدُ لِلَّهِ", "repetition_count": 33},
+         {"label": "Allahu Akbar", "arabic_text": "اللَّهُ أَكْبَرُ", "repetition_count": 33},
+         {"label": "La ilaha illAllah...", "arabic_text": "لَا إِلَٰهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ", "repetition_count": 1}
+     ]},
     {"key": "la_ilaha_dhikr", "name": "Tahlil (La ilaha illAllah) ×1000", "category": "dhikr", "habit_type": "quantity", "difficulty": "hard",
      "icon": "☝️", "target_count": 1000, "unit": "times",
      "islamic_source": "Ibn Majah 3794 — Renews iman and is the best dhikr",
@@ -160,7 +180,13 @@ HABIT_LIBRARY = [
      "islamic_source": "Bukhari 5017 — Whoever reads Ayat al-Kursi before sleep, an angel protects him till morning",
      "minimum_version": "Just Ayat al-Kursi — 30 seconds",
      "estimated_minutes": 3, "anchor_prayer": "isha",
-     "description": "Bedtime protection supplications"},
+     "description": "Bedtime protection supplications",
+     "checklist_items": [
+         {"label": "Ayat al-Kursi", "arabic_text": "اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ", "repetition_count": 1},
+         {"label": "Surah Al-Ikhlas", "arabic_text": "قُلْ هُوَ اللَّهُ أَحَدٌ", "repetition_count": 3},
+         {"label": "Surah Al-Falaq", "arabic_text": "قُلْ أَعُوذُ بِرَبِّ ٱلْفَلَقِ", "repetition_count": 3},
+         {"label": "Surah An-Nas", "arabic_text": "قُلْ أَعُوذُ بِرَبِّ ٱلنَّاسِ", "repetition_count": 3}
+     ]},
 
     # ─── Fasting (5) ───────────────────────────────────────────────────────
     {"key": "monday_thursday_fast", "name": "Fast Monday and Thursday", "category": "fasting", "habit_type": "quantity", "difficulty": "medium",

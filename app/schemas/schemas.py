@@ -552,6 +552,7 @@ class ChecklistItemResponse(IDSchema, _TS):
     sort_order: int
     arabic_text: _Opt[str] = None
     repetition_count: int
+    completed_today: bool = False
 
 
 class DhikrSessionCreate(AppBaseModel):

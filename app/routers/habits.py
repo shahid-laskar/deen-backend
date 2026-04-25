@@ -91,8 +91,26 @@ async def add_from_library(current_user: CurrentUser, db: DB, habit_repo: HabitR
     template = next((h for h in HABIT_LIBRARY if h["key"] == key), None)
     if not template:
         raise HTTPException(404, f"Library habit '{key}' not found.")
-    data = {k: v for k, v in template.items() if k not in ("key", "estimated_minutes", "description")}
+    
+    checklist_items = template.get("checklist_items", [])
+    data = {k: v for k, v in template.items() if k not in ("key", "estimated_minutes", "description", "checklist_items")}
     habit = await habit_repo.create(user_id=current_user.id, is_preset=True, is_active=True, **data)
+    
+    if checklist_items:
+        from app.models.habit import HabitChecklistItem
+        for i, item_data in enumerate(checklist_items):
+            item = HabitChecklistItem(
+                habit_id=habit.id,
+                user_id=current_user.id,
+                label=item_data["label"],
+                arabic_text=item_data.get("arabic_text"),
+                repetition_count=item_data.get("repetition_count", 1),
+                sort_order=i
+            )
+            db.add(item)
+        await db.commit()
+        await db.refresh(habit)
+        
     return HabitResponseV2.model_validate(habit)
 
 
@@ -227,9 +245,21 @@ async def get_habit_analytics(habit_id: UUID, current_user: CurrentUser, db: DB,
 @router.get("/{habit_id}/checklist", response_model=list[ChecklistItemResponse])
 async def list_checklist(habit_id: UUID, current_user: CurrentUser, db: DB, habit_repo: HabitRepo):
     await habit_repo.get_owned_or_404(habit_id, current_user.id)
-    from app.models.habit import HabitChecklistItem
-    r = await db.execute(select(HabitChecklistItem).where(HabitChecklistItem.habit_id == habit_id).order_by(HabitChecklistItem.sort_order))
-    return [ChecklistItemResponse.model_validate(i) for i in r.scalars().all()]
+    from app.models.habit import HabitChecklistItem, HabitChecklistLog
+    from sqlalchemy.orm import aliased
+    r = await db.execute(
+        select(HabitChecklistItem, HabitChecklistLog.completed)
+        .outerjoin(HabitChecklistLog, (HabitChecklistItem.id == HabitChecklistLog.item_id) & (HabitChecklistLog.log_date == date.today()))
+        .where(HabitChecklistItem.habit_id == habit_id)
+        .order_by(HabitChecklistItem.sort_order)
+    )
+    items = []
+    for row in r.all():
+        item_obj, completed = row
+        item_dict = ChecklistItemResponse.model_validate(item_obj).model_dump()
+        item_dict["completed_today"] = bool(completed)
+        items.append(item_dict)
+    return items
 
 
 @router.post("/{habit_id}/checklist", response_model=ChecklistItemResponse, status_code=201)
@@ -252,14 +282,41 @@ async def delete_checklist_item(habit_id: UUID, item_id: UUID, current_user: Cur
 
 
 @router.post("/{habit_id}/checklist/{item_id}/log", response_model=MessageResponse)
-async def toggle_checklist_item(habit_id: UUID, item_id: UUID, current_user: CurrentUser, db: DB):
-    from app.models.habit import HabitChecklistLog
+async def toggle_checklist_item(habit_id: UUID, item_id: UUID, current_user: CurrentUser, db: DB, habit_repo: HabitRepo, habit_log_repo: HabitLogRepo):
+    from app.models.habit import HabitChecklistItem, HabitChecklistLog
     r = await db.execute(select(HabitChecklistLog).where(HabitChecklistLog.item_id == item_id, HabitChecklistLog.log_date == date.today()))
     ex = r.scalar_one_or_none()
     if ex:
         ex.completed = not ex.completed; await db.flush()
     else:
         db.add(HabitChecklistLog(item_id=item_id, user_id=current_user.id, log_date=date.today(), completed=True)); await db.flush()
+    
+    # Check if all items are completed
+    items_r = await db.execute(select(HabitChecklistItem.id).where(HabitChecklistItem.habit_id == habit_id))
+    all_item_ids = items_r.scalars().all()
+    if all_item_ids:
+        logs_r = await db.execute(
+            select(HabitChecklistLog.item_id)
+            .where(HabitChecklistLog.item_id.in_(all_item_ids), HabitChecklistLog.log_date == date.today(), HabitChecklistLog.completed == True)
+        )
+        completed_item_ids = logs_r.scalars().all()
+        all_completed = set(all_item_ids) == set(completed_item_ids)
+        
+        # Log the habit completion
+        habit = await habit_repo.get_owned_or_404(habit_id, current_user.id)
+        await habit_log_repo.upsert(
+            habit_id=habit_id, user_id=current_user.id, log_date=date.today(),
+            count=1 if all_completed else 0, completed=all_completed, notes="Auto-updated from checklist"
+        )
+        # Update streak
+        logs = await habit_log_repo.get_for_habit(habit.id, days=365)
+        sd = _streak(logs, habit.target_count)
+        total = len([l for l in logs if l.completed])
+        new_tokens = habit.rahmah_tokens or 0
+        if all_completed and total > 0 and total % 30 == 0:
+            new_tokens = min(new_tokens + 1, 3)
+        await habit_repo.update(habit, current_streak=sd["current_streak"], longest_streak=max(habit.longest_streak or 0, sd["longest_streak"]), total_completions=total, rahmah_tokens=new_tokens)
+        
     return MessageResponse(message="Toggled.")
 
 
