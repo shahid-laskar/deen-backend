@@ -420,6 +420,29 @@ class ChildStoryProgressResponse(OrmBase):
     created_at: datetime
 
 
+class ChildQuranProgressUpdate(BaseModel):
+    status: Optional[str] = None
+    ayahs_memorized: Optional[int] = None
+    quality_rating: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class ChildQuranProgressResponse(OrmBase):
+    id: uuid.UUID
+    child_id: uuid.UUID
+    surah_number: int
+    surah_name: str
+    status: str
+    ayahs_memorized: int
+    total_ayahs: int
+    started_date: Optional[date] = None
+    memorized_date: Optional[date] = None
+    last_reviewed: Optional[date] = None
+    quality_rating: Optional[int] = None
+    notes: Optional[str] = None
+    created_at: datetime
+
+
 # ─── Recitation ───────────────────────────────────────────────────────────────
 
 class RecitationSessionCreate(BaseModel):

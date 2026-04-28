@@ -16,7 +16,7 @@ from app.schemas.v2schemas import (
     LessonLogCreate, LessonLogResponse,
     ChildActivityLogCreate, ChildActivityLogResponse,
     ChildBadgeResponse, ChildActivityResult,
-    ChildStoryProgressResponse,
+    ChildStoryProgressResponse, ChildQuranProgressResponse, ChildQuranProgressUpdate,
 )
 
 router = APIRouter(prefix="/children", tags=["children"])
@@ -286,7 +286,12 @@ async def practice_dua(child_id: UUID, log_id: UUID, current_user: CurrentUser, 
     )
 
 
-# ─── Lessons ─────────────────────────────────────────────────────────────────
+# ─── Lessons & Curriculum ───────────────────────────────────────────────────
+
+@router.get("/curriculum")
+async def get_curriculum_endpoint(age_group: str = Query(default="young")):
+    from app.services.child_curriculum import get_curriculum
+    return get_curriculum(age_group)
 
 @router.get("/{child_id}/lessons", response_model=list[LessonLogResponse])
 async def list_lessons(child_id: UUID, current_user: CurrentUser, db: DB, repo: LessonLogRepo,
@@ -295,11 +300,62 @@ async def list_lessons(child_id: UUID, current_user: CurrentUser, db: DB, repo: 
     return [LessonLogResponse.model_validate(l) for l in logs]
 
 
-@router.post("/{child_id}/lessons", response_model=LessonLogResponse, status_code=201)
+@router.get("/{child_id}/lessons/stats")
+async def lesson_stats(child_id: UUID, current_user: CurrentUser, db: DB, repo: LessonLogRepo):
+    logs = await repo.get_for_child(child_id)
+    stats = {}
+    total_minutes = 0
+    for log in logs:
+        if log.subject not in stats:
+            stats[log.subject] = {"count": 0, "minutes": 0}
+        stats[log.subject]["count"] += 1
+        minutes = log.duration_minutes or 0
+        stats[log.subject]["minutes"] += minutes
+        total_minutes += minutes
+    
+    return {
+        "total_lessons": len(logs),
+        "total_minutes": total_minutes,
+        "by_subject": stats
+    }
+
+
+@router.post("/{child_id}/lessons", response_model=ChildActivityResult, status_code=201)
 async def log_lesson(child_id: UUID, payload: LessonLogCreate, current_user: CurrentUser,
                       db: DB, repo: LessonLogRepo):
+    from app.models.child import ChildActivityLog
+    from app.services.child_gamification import process_activity
+    from app.routers.child import ChildRepo
+
+    child_repo = ChildRepo(db)
+    child = await child_repo.get_owned_or_404(child_id, current_user.id)
+
     log = await repo.create(child_id=child_id, user_id=current_user.id, **payload.model_dump())
-    return LessonLogResponse.model_validate(log)
+
+    # Create gamification activity log
+    activity = ChildActivityLog(
+        child_id=child.id,
+        user_id=current_user.id,
+        activity_key=f"lesson_{log.subject.lower()}",
+        activity_name=f"Learned {log.subject}: {log.topic}",
+        activity_category="lesson",
+        xp_earned=15, # Base XP for a lesson
+        completed=True,
+        log_date=payload.lesson_date or date.today(),
+        logged_by="parent",
+        duration_minutes=payload.duration_minutes
+    )
+    db.add(activity)
+    await db.flush()
+    await db.refresh(activity)
+
+    result = await process_activity(db, child, current_user.id, activity)
+
+    return ChildActivityResult(
+        activity=ChildActivityLogResponse.model_validate(activity),
+        **result,
+        new_badges=[ChildBadgeResponse.model_validate(b) for b in result["new_badges"]],
+    )
 
 
 # ─── Activities (XP / Gamification) ─────────────────────────────────────────
@@ -430,8 +486,72 @@ async def child_stats(child_id: UUID, current_user: CurrentUser, db: DB, repo: C
         "category_breakdown": category_breakdown,
     }
 
+@router.get("/{child_id}/analytics")
+async def child_analytics(child_id: UUID, current_user: CurrentUser, db: DB, repo: ChildRepo):
+    from app.models.child import ChildActivityLog, ChildBadge, ChildMilestone, ChildQuranProgress, DuaTeachingLog, ChildStoryProgress
+    from datetime import timedelta
+
+    child = await repo.get_owned_or_404(child_id, current_user.id)
+    today = date.today()
+    thirty_days_ago = today - timedelta(days=30)
+
+    # 1. 30-day activity heatmap
+    heatmap_result = await db.execute(
+        select(ChildActivityLog.log_date, func.count().label("cnt"))
+        .where(ChildActivityLog.child_id == child_id, ChildActivityLog.log_date >= thirty_days_ago)
+        .group_by(ChildActivityLog.log_date)
+    )
+    heatmap = {row.log_date.isoformat(): row.cnt for row in heatmap_result.all()}
+
+    # 2. Milestones progress
+    ms_result = await db.execute(select(ChildMilestone.category, ChildMilestone.is_completed).where(ChildMilestone.child_id == child_id))
+    milestones = ms_result.all()
+    ms_stats = {"achieved": 0, "total": len(milestones), "by_category": {}}
+    for cat, completed in milestones:
+        if cat not in ms_stats["by_category"]: ms_stats["by_category"][cat] = {"achieved": 0, "total": 0}
+        ms_stats["by_category"][cat]["total"] += 1
+        if completed: 
+            ms_stats["by_category"][cat]["achieved"] += 1
+            ms_stats["achieved"] += 1
+
+    # 3. Quran progress
+    quran_result = await db.execute(select(ChildQuranProgress.status, ChildQuranProgress.ayahs_memorized).where(ChildQuranProgress.child_id == child_id))
+    quran_logs = quran_result.all()
+    quran_stats = {
+        "surahs_memorized": sum(1 for q in quran_logs if q.status == "memorized"),
+        "surahs_learning": sum(1 for q in quran_logs if q.status in ["learning", "memorizing"]),
+        "total_ayahs": sum(q.ayahs_memorized for q in quran_logs)
+    }
+
+    # 4. Duas progress
+    dua_result = await db.execute(select(DuaTeachingLog.status).where(DuaTeachingLog.child_id == child_id))
+    dua_logs = dua_result.all()
+    dua_stats = {
+        "mastered": sum(1 for d in dua_logs if d.status == "mastered"),
+        "learning": sum(1 for d in dua_logs if d.status in ["learning", "practicing"]),
+        "total": len(dua_logs)
+    }
+
+    # 5. Stories read
+    story_result = await db.execute(select(func.count()).select_from(ChildStoryProgress).where(ChildStoryProgress.child_id == child_id, ChildStoryProgress.times_read > 0))
+    stories_read = story_result.scalar_one()
+
+    return {
+        "child_id": child_id,
+        "heatmap": heatmap,
+        "milestones_progress": ms_stats,
+        "quran_progress": quran_stats,
+        "duas_progress": dua_stats,
+        "stories_read": stories_read,
+    }
+
 
 # ─── Stories ─────────────────────────────────────────────────────────────────
+
+@router.get("/story-library")
+async def get_story_library_endpoint(age_group: str = Query(default=None), category: str = Query(default=None)):
+    from app.services.child_stories import get_stories_by_category
+    return get_stories_by_category(age_group=age_group, category=category)
 
 @router.get("/{child_id}/stories/progress", response_model=list[ChildStoryProgressResponse])
 async def list_story_progress(child_id: UUID, current_user: CurrentUser, db: DB, repo: ChildRepo):
@@ -508,3 +628,88 @@ async def toggle_favorite_story(child_id: UUID, key: str, current_user: CurrentU
     await db.flush()
     await db.refresh(progress)
     return ChildStoryProgressResponse.model_validate(progress)
+
+
+# ─── Quran Memorization ──────────────────────────────────────────────────────
+
+@router.get("/{child_id}/quran", response_model=list[ChildQuranProgressResponse])
+async def list_quran_progress(child_id: UUID, current_user: CurrentUser, db: DB, repo: ChildRepo):
+    from app.models.child import ChildQuranProgress
+    await repo.get_owned_or_404(child_id, current_user.id)
+    result = await db.execute(
+        select(ChildQuranProgress)
+        .where(ChildQuranProgress.child_id == child_id)
+        .order_by(ChildQuranProgress.surah_number.asc())
+    )
+    return [ChildQuranProgressResponse.model_validate(p) for p in result.scalars().all()]
+
+
+@router.post("/{child_id}/quran", response_model=ChildQuranProgressResponse, status_code=201)
+async def track_surah(child_id: UUID, payload: dict, current_user: CurrentUser, db: DB, repo: ChildRepo):
+    from app.models.child import ChildQuranProgress
+    await repo.get_owned_or_404(child_id, current_user.id)
+    
+    surah_number = payload.get("surah_number")
+    surah_name = payload.get("surah_name")
+    total_ayahs = payload.get("total_ayahs")
+    
+    if not surah_number or not surah_name or not total_ayahs:
+        raise HTTPException(400, "Missing required surah fields")
+        
+    result = await db.execute(
+        select(ChildQuranProgress).where(
+            ChildQuranProgress.child_id == child_id,
+            ChildQuranProgress.surah_number == surah_number
+        )
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(400, "Surah already being tracked")
+        
+    progress = ChildQuranProgress(
+        child_id=child_id,
+        user_id=current_user.id,
+        surah_number=surah_number,
+        surah_name=surah_name,
+        total_ayahs=total_ayahs,
+        status="learning",
+        started_date=date.today(),
+    )
+    db.add(progress)
+    await db.flush()
+    await db.refresh(progress)
+    return ChildQuranProgressResponse.model_validate(progress)
+
+
+@router.patch("/{child_id}/quran/{surah_number}", response_model=ChildQuranProgressResponse)
+async def update_surah_progress(child_id: UUID, surah_number: int, payload: ChildQuranProgressUpdate, current_user: CurrentUser, db: DB, repo: ChildRepo):
+    from app.models.child import ChildQuranProgress
+    await repo.get_owned_or_404(child_id, current_user.id)
+    
+    result = await db.execute(
+        select(ChildQuranProgress).where(
+            ChildQuranProgress.child_id == child_id,
+            ChildQuranProgress.surah_number == surah_number
+        )
+    )
+    progress = result.scalar_one_or_none()
+    if not progress:
+        raise HTTPException(404, "Surah not being tracked")
+        
+    if payload.status is not None:
+        progress.status = payload.status
+        if payload.status == "memorized" and not progress.memorized_date:
+            progress.memorized_date = date.today()
+    
+    if payload.ayahs_memorized is not None:
+        progress.ayahs_memorized = payload.ayahs_memorized
+        
+    if payload.quality_rating is not None:
+        progress.quality_rating = payload.quality_rating
+        progress.last_reviewed = date.today()
+        
+    if payload.notes is not None:
+        progress.notes = payload.notes
+        
+    await db.flush()
+    await db.refresh(progress)
+    return ChildQuranProgressResponse.model_validate(progress)
