@@ -1,3 +1,13 @@
+"""
+Auth Router
+===========
+Fixes applied:
+  - Refresh token rotation (old token revoked, new one issued on /refresh)
+  - /refresh now returns full TokenResponse (access + refresh + user)
+  - /device-token endpoint for FCM/APNs push registration
+  - device_id stored per refresh token for per-device session management
+  - Login revokes only the same device's prior token (not all tokens)
+"""
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, HTTPException, status
@@ -14,7 +24,7 @@ from app.core.security import (
 )
 from app.repositories import UserRepo
 from app.schemas.auth import (
-    AccessTokenResponse,
+    DeviceTokenRequest,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
@@ -47,6 +57,7 @@ async def register(payload: RegisterRequest, db: DB, user_repo: UserRepo):
         user_id=user.id,
         token_hash=hash_token(refresh_token_str),
         expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        device_id=payload.device_id,
     )
     user = await user_repo.get_with_profile_or_404(user.id)
     return TokenResponse(
@@ -65,13 +76,22 @@ async def login(payload: LoginRequest, db: DB, user_repo: UserRepo):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is deactivated.")
+
     access_token = create_access_token(str(user.id))
     refresh_token_str = create_refresh_token(str(user.id))
-    await user_repo.revoke_all_refresh_tokens(user.id)
+
+    # Per-device session: revoke only this device's prior token (not all devices)
+    if payload.device_id:
+        await user_repo.revoke_refresh_token_by_device(user.id, payload.device_id)
+    else:
+        # Web login: revoke all (single session for web)
+        await user_repo.revoke_all_refresh_tokens(user.id)
+
     await user_repo.create_refresh_token(
         user_id=user.id,
         token_hash=hash_token(refresh_token_str),
         expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        device_id=payload.device_id,
     )
     user = await user_repo.get_with_profile_or_404(user.id)
     return TokenResponse(
@@ -81,8 +101,10 @@ async def login(payload: LoginRequest, db: DB, user_repo: UserRepo):
     )
 
 
-@router.post("/refresh", response_model=AccessTokenResponse)
+@router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(payload: RefreshRequest, db: DB, user_repo: UserRepo):
+    """Refresh tokens with rotation: old refresh token revoked, new pair issued.
+    Returns full user object — useful for mobile apps refreshing stale user state."""
     from jose import JWTError
     try:
         token_data = decode_token(payload.refresh_token)
@@ -91,15 +113,34 @@ async def refresh_token(payload: RefreshRequest, db: DB, user_repo: UserRepo):
         user_id = token_data.get("sub")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token.")
+
     stored = await user_repo.get_refresh_token_by_hash(hash_token(payload.refresh_token))
     if not stored:
         raise HTTPException(status_code=401, detail="Refresh token has been revoked.")
+
     expires = stored.expires_at
     if expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)
     if expires < datetime.now(timezone.utc):
         raise HTTPException(status_code=401, detail="Refresh token has expired.")
-    return AccessTokenResponse(access_token=create_access_token(user_id))
+
+    # Token rotation: revoke old, issue new pair
+    await user_repo.revoke_refresh_token_by_hash(stored.user_id, hash_token(payload.refresh_token))
+    new_access_token = create_access_token(user_id)
+    new_refresh_token = create_refresh_token(user_id)
+    await user_repo.create_refresh_token(
+        user_id=stored.user_id,
+        token_hash=hash_token(new_refresh_token),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        device_id=stored.device_id,
+    )
+
+    user = await user_repo.get_with_profile_or_404(stored.user_id)
+    return TokenResponse(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        user=UserResponse.model_validate(user),
+    )
 
 
 @router.post("/logout", response_model=MessageResponse)
@@ -112,3 +153,21 @@ async def logout(current_user: CurrentUser, payload: RefreshRequest, db: DB, use
 async def get_me(current_user: CurrentUser, db: DB, user_repo: UserRepo):
     user = await user_repo.get_with_profile_or_404(current_user.id)
     return UserResponse.model_validate(user)
+
+
+@router.post("/device-token", response_model=MessageResponse)
+async def register_device_token(
+    payload: DeviceTokenRequest,
+    current_user: CurrentUser,
+    db: DB,
+    user_repo: UserRepo,
+):
+    """Register FCM (Android) or APNs (iOS) push notification token.
+    Call this on app launch after notification permission is granted."""
+    await user_repo.upsert_device_push_token(
+        user_id=current_user.id,
+        push_token=payload.push_token,
+        platform=payload.platform,
+        device_id=payload.device_id,
+    )
+    return MessageResponse(message="Device token registered.")

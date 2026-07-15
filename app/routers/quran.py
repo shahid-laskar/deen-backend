@@ -69,7 +69,16 @@ async def list_surahs():
 @router.get("/surah/{n}")
 async def get_surah(n: int, translation_id: int = Query(default=131), reciter_id: int = Query(default=7)):
     if not 1 <= n <= 114: raise HTTPException(422, "Surah 1-114.")
-    try: return await fetch_surah(n, translation_id, reciter_id)
+    try: 
+        # Fetch metadata and verses in parallel (or sequence for simplicity)
+        surahs = await fetch_surah_list()
+        meta = next((s for s in surahs if s["id"] == n), {})
+        verses_data = await fetch_surah(n, translation_id, reciter_id)
+        
+        return {
+            **meta,
+            "verses": verses_data.get("verses", [])
+        }
     except Exception as e: raise HTTPException(503, str(e))
 
 

@@ -1,7 +1,7 @@
 # Import all models so SQLAlchemy registers them with Base.metadata.
 # Alembic autogenerate reads this module.
 
-from app.models.user import User, UserProfile, RefreshToken
+from app.models.user import User, UserProfile, RefreshToken, DevicePushToken
 from app.models.prayer import PrayerLog, IslamicEvent, Mosque
 from app.models.quran import HifzProgress, DuaFavorite
 from app.models.habit import Habit, HabitLog
@@ -31,7 +31,7 @@ from app.models.learning import LearningPath, LearningModule, LessonContent, Use
 from app.models.health import WaterLog, SleepLog
 
 __all__ = [
-    "User", "UserProfile", "RefreshToken",
+    "User", "UserProfile", "RefreshToken", "DevicePushToken",
     "PrayerLog",
     "HifzProgress", "DuaFavorite",
     "Habit", "HabitLog",

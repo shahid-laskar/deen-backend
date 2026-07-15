@@ -117,6 +117,9 @@ class User(Base, TimestampMixin):
     quests: Mapped[list["UserQuest"]] = relationship(
         "UserQuest", back_populates="user", cascade="all, delete-orphan"
     )
+    device_push_tokens: Mapped[list["DevicePushToken"]] = relationship(
+        "DevicePushToken", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email}>"
@@ -163,8 +166,32 @@ class RefreshToken(Base):
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    device_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)  # Mobile device UUID
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
+
+
+class DevicePushToken(Base):
+    """Stores FCM (Android) or APNs (iOS) push notification tokens per device."""
+    __tablename__ = "device_push_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False, index=True
+    )
+    push_token: Mapped[str] = mapped_column(String(512), nullable=False)
+    platform: Mapped[str] = mapped_column(String(10), nullable=False)  # "android" | "ios"
+    device_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="device_push_tokens")

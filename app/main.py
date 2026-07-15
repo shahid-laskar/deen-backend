@@ -27,6 +27,8 @@ from app.routers import (
     finance, family,
     # Phase 9
     learning, health,
+    # Mobile
+    dashboard,
 )
 from app.routers.habits import dhikr_router
 from app.routers.journal import insights_router, letters_router
@@ -115,6 +117,9 @@ app.include_router(family.router, prefix=API)
 # Phase 9 — Learning & Health
 app.include_router(learning.router, prefix=API)
 app.include_router(health.router, prefix=API)
+# Mobile-optimised aggregated endpoints
+from app.routers.dashboard import router as dashboard_router
+app.include_router(dashboard_router, prefix=API)
 # Phase 10 — Admin, GDPR & Notifications
 from app.routers.admin import router as admin_router, gdpr_router, notif_router
 app.include_router(admin_router, prefix=API)

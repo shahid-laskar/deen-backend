@@ -1,16 +1,17 @@
 """
 User Repository
 ===============
-All DB access for User, UserProfile, RefreshToken.
+DB access for User, UserProfile, RefreshToken, DevicePushToken.
 """
 
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
-from app.models.user import User, UserProfile, RefreshToken
+from app.models.user import User, UserProfile, RefreshToken, DevicePushToken
 from app.repositories.base import BaseRepository
 
 
@@ -71,12 +72,17 @@ class UserRepository(BaseRepository[User]):
     # ─── Refresh tokens ───────────────────────────────────────────────────────
 
     async def create_refresh_token(
-        self, user_id: UUID, token_hash: str, expires_at: datetime
+        self,
+        user_id: UUID,
+        token_hash: str,
+        expires_at: datetime,
+        device_id: Optional[str] = None,
     ) -> RefreshToken:
         token = RefreshToken(
             user_id=user_id,
             token_hash=token_hash,
             expires_at=expires_at,
+            device_id=device_id,
         )
         self.db.add(token)
         await self.db.flush()
@@ -104,3 +110,52 @@ class UserRepository(BaseRepository[User]):
             .where(RefreshToken.user_id == user_id, RefreshToken.token_hash == token_hash)
             .values(is_revoked=True)
         )
+
+    async def revoke_refresh_token_by_device(self, user_id: UUID, device_id: str) -> None:
+        """Revoke all refresh tokens for this user+device pair (for per-device login)."""
+        await self.db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.user_id == user_id,
+                RefreshToken.device_id == device_id,
+                RefreshToken.is_revoked == False,
+            )
+            .values(is_revoked=True)
+        )
+
+    # ─── Device push tokens ───────────────────────────────────────────────────
+
+    async def upsert_device_push_token(
+        self,
+        user_id: UUID,
+        push_token: str,
+        platform: str,
+        device_id: Optional[str] = None,
+    ) -> DevicePushToken:
+        """Insert or update a FCM/APNs push token. Idempotent per device_id."""
+        existing = None
+        if device_id:
+            result = await self.db.execute(
+                select(DevicePushToken).where(DevicePushToken.device_id == device_id)
+            )
+            existing = result.scalar_one_or_none()
+
+        if existing:
+            existing.push_token = push_token
+            existing.platform = platform
+            existing.user_id = user_id
+            existing.is_active = True
+            await self.db.flush()
+            await self.db.refresh(existing)
+            return existing
+
+        token = DevicePushToken(
+            user_id=user_id,
+            push_token=push_token,
+            platform=platform,
+            device_id=device_id,
+        )
+        self.db.add(token)
+        await self.db.flush()
+        await self.db.refresh(token)
+        return token
